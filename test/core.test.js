@@ -65,3 +65,10 @@ test('dates: month arithmetic clamps to month end', () => {
   assert.equal(C.addMonths('2026-01-31', 1), '2026-02-28');
   assert.equal(C.addMonths('2026-10-08', 12), '2027-10-08');
 });
+test('end dates: months covering a stay, 3-month monthly minimum, annual 12+ months', () => {
+  assert.equal(C.monthsCovering('2026-10-15', '2027-01-15'), 3);
+  assert.equal(C.monthsCovering('2026-10-15', '2027-01-20'), 4, 'part months round up');
+  assert.equal(C.quote(rates, { lengthM: 5, pkg: 'standard', term: 'annual', months: 6 }).months, 12, 'annual never under 12');
+  assert.equal(C.quote(rates, { lengthM: 5, pkg: 'standard', term: 'annual', months: 18 }).months, 18);
+  assert.equal(C.quote(rates, { lengthM: 5, pkg: 'standard', term: 'monthly', months: 7 }).contractValue, 607 * 7);
+});

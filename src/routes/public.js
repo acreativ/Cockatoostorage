@@ -55,12 +55,19 @@ module.exports = (h, app) => {
     const lengthM = req.query.unit === 'ft' ? C.ftToM(Number(req.query.length)) : Number(req.query.length);
     if (!(lengthM > 0 && lengthM <= 30)) return res.status(400).json({ error: 'Enter a boat length between 1 and 30 metres.' });
     const start = /^\d{4}-\d{2}-\d{2}$/.test(req.query.start || '') && req.query.start >= C.todaySyd() ? req.query.start : C.addDays(C.todaySyd(), 7);
+    // Requested stay: end date (at least 3 months after start). Annual contracts are never shorter than 12 months.
+    const minEnd = C.addMonths(start, 3);
+    const end = /^\d{4}-\d{2}-\d{2}$/.test(req.query.end || '') && req.query.end >= minEnd ? req.query.end : C.addMonths(start, 12);
+    const stay = C.monthsCovering(start, end);
     const options = [];
     for (const pkg of ['standard', 'unlimited']) for (const term of ['annual', 'monthly']) {
-      try { options.push({ ...S.getQuote(h, { lengthM, pkg, term }), available: S.availableBays(h, lengthM, start, S.bookingEnd(start, term)).length, end: S.bookingEnd(start, term) }); }
-      catch (e) { return res.json({ lengthM, start, error: e.message, options: [] }); }
+      try {
+        const q = S.getQuote(h, { lengthM, pkg, term, months: stay });
+        const bEnd = S.stayEnd(start, term, end);
+        options.push({ ...q, end: bEnd, endLabel: C.fmtDate(bEnd), extendsStay: bEnd > end, available: S.availableBays(h, lengthM, start, bEnd).length });
+      } catch (e) { return res.json({ lengthM, start, end, error: e.message, options: [] }); }
     }
-    res.json({ lengthM, lengthFt: C.mToFt(lengthM), start, startLabel: C.fmtDate(start), options });
+    res.json({ lengthM, lengthFt: C.mToFt(lengthM), start, startLabel: C.fmtDate(start), end, endLabel: C.fmtDate(end), minEnd, stayMonths: stay, options });
   });
 
   // ----- Quote & booking flow -----
@@ -112,8 +119,11 @@ module.exports = (h, app) => {
     try { qq = S.getQuote(h, { lengthM, pkg: b.pkg, term: b.term, months: b.months }); } catch (e) { return back(e.message); }
     const start = clean(b.start, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || start < C.todaySyd()) return back('Choose a start date from today onwards.');
+    const end = clean(b.end, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(end) || end < C.addMonths(start, 3)) return back('Choose an end date at least 3 months after the start date.');
+    try { qq = S.getQuote(h, { lengthM, pkg: b.pkg, term: b.term, months: C.monthsCovering(start, end) }); } catch (e) { return back(e.message); }
     const action = b.action; // enquire | card | bank
-    const quoteInfo = { ...qq, start, boat: { type: clean(b.type, 60), make_model: clean(b.make_model, 120), trailer: b.trailer === 'yes', rego: clean(b.rego, 20), hin: clean(b.hin, 30) } };
+    const quoteInfo = { ...qq, start, end: S.stayEnd(start, qq.term, end), boat: { type: clean(b.type, 60), make_model: clean(b.make_model, 120), trailer: b.trailer === 'yes', rego: clean(b.rego, 20), hin: clean(b.hin, 30) } };
     const cust = S.upsertCustomer(h, { name, email, phone, source: 'website' });
 
     if (action === 'enquire') {
@@ -132,7 +142,7 @@ module.exports = (h, app) => {
         const isCard = action === 'card';
         const bk = S.createBooking(h, {
           lengthM, customer_id: cust.id, boat_id: Number(boat.lastInsertRowid), lead_id: leadId, package: qq.pkg, term: qq.term, monthly_rate: qq.monthly,
-          start_date: start, end_date: S.bookingEnd(start, qq.term, qq.months), deposit_amount: qq.deposit,
+          start_date: start, end_date: S.stayEnd(start, qq.term, end), deposit_amount: qq.deposit,
           status: isCard ? 'hold' : 'pending',
           hold_expires_at: isCard ? new Date(Date.now() + Number(h.setting('hold_minutes', 30)) * 60e3).toISOString() : null,
           pending_expires_at: isCard ? null : new Date(Date.now() + Number(h.setting('pending_days', 3)) * 86400e3).toISOString(),

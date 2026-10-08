@@ -22,7 +22,7 @@ const NAV = [
 ];
 
 const upload = multer({
-  storage: multer.diskStorage({ destination: path.join(__dirname, '..', '..', 'uploads'),
+  storage: multer.diskStorage({ destination: process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads'),
     filename: (req, f, cb) => cb(null, crypto.randomBytes(10).toString('hex') + path.extname(f.originalname).toLowerCase().slice(0, 6)) }),
   limits: { fileSize: 12 * 1024 * 1024, files: 12 },
   fileFilter: (req, f, cb) => cb(null, /^(image\/|application\/pdf)/.test(f.mimetype)),

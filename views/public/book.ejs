@@ -2,7 +2,7 @@
 <%# Single-page booking flow: steps switch instantly in the browser; only the final step posts to the server. %>
 <div class="tripbar"><div class="wrap">
   <div class="tb-item"><span class="tb-l">Boat</span><span class="tb-v" data-bind="boat">Tell us your boat length</span></div>
-  <div class="tb-item"><span class="tb-l">Storage from</span><span class="tb-v" data-bind="start">—</span></div>
+  <div class="tb-item"><span class="tb-l">Storage dates</span><span class="tb-v" data-bind="dates">—</span></div>
   <div class="tb-item"><span class="tb-l">Package</span><span class="tb-v" data-bind="pkgLabel">—</span></div>
   <button type="button" class="btn btn-ghost-light btn-sm" data-go="1">Modify</button>
 </div></div>
@@ -20,13 +20,16 @@
     <!-- STEP 1 -->
     <section class="panel" data-panel="1" aria-labelledby="s1h">
       <h1 id="s1h" style="font-size:1.75rem">Where’s your boat going to live?</h1>
-      <p class="muted">Enter the overall length and when you’d like to start. We’ll show every package with live bay availability.</p>
+      <p class="muted">Enter the overall length and the dates you need storage. We’ll show every package with live bay availability.</p>
       <form id="s1">
         <div class="row">
           <div class="field"><label for="length">Boat length (overall)</label>
             <div class="unit-input"><input id="length" name="length" type="number" inputmode="decimal" step="0.1" min="1" max="100" required>
             <select name="unit" id="unit" aria-label="Unit"><option value="m">metres</option><option value="ft">feet</option></select></div></div>
+        </div>
+        <div class="row">
           <div class="field"><label for="start">Start date</label><input id="start" name="start" type="date" min="<%= C.todaySyd() %>" required></div>
+          <div class="field"><label for="end">End date</label><input id="end" name="end" type="date" required><span class="hint">At least 3 months after the start. Annual contracts run 12 months or more.</span></div>
         </div>
         <div class="field"><span class="label" id="typel">Boat type</span>
           <div class="type-tiles" role="radiogroup" aria-labelledby="typel">
@@ -57,7 +60,7 @@
     <!-- STEP 3 -->
     <form method="post" action="/book" id="bookform" data-panel="3" hidden>
       <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <input type="hidden" name="lengthM"><input type="hidden" name="pkg"><input type="hidden" name="term"><input type="hidden" name="start"><input type="hidden" name="type">
+      <input type="hidden" name="lengthM"><input type="hidden" name="pkg"><input type="hidden" name="term"><input type="hidden" name="start"><input type="hidden" name="end"><input type="hidden" name="type">
       <div class="panel">
         <h2>Your boat</h2>
         <div class="row">
@@ -98,6 +101,7 @@
     <dl>
       <dt>Boat</dt><dd class="num" data-bind="boatShort">—</dd>
       <dt>Start</dt><dd data-bind="start">—</dd>
+      <dt>End</dt><dd data-bind="endLabel">—</dd>
       <dt>Package</dt><dd data-bind="pkgLabel">—</dd>
       <dt>Term</dt><dd data-bind="termLabel">—</dd>
       <dt>Size band</dt><dd data-bind="band">—</dd>
@@ -134,17 +138,19 @@
   const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const aud = (n) => '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
   const init = new URLSearchParams(location.search);
-  const S = { step: 1, length: init.get('length') || '', unit: init.get('unit') || 'm', start: init.get('start') || '<%= start %>', type: init.get('type') || 'Runabout',
+  const S = { step: 1, length: init.get('length') || '', unit: init.get('unit') || 'm', start: init.get('start') || '<%= start %>', end: init.get('end') || '', type: init.get('type') || 'Runabout',
     pkg: init.get('pkg') || init.get('pref') || null, term: init.get('term') || 'annual', data: null };
   const cache = new Map();
+  const addMonths = (s, n) => { const [y, m, d] = s.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1 + n, 1)); const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate(); t.setUTCDate(Math.min(d, last)); return t.toISOString().slice(0, 10); };
+  const fixEnd = () => { const min = addMonths(S.start, 3); f1.end.min = min; if (!S.end || S.end < min) S.end = addMonths(S.start, 12); f1.end.value = S.end; };
   const PK = {
     standard: { title: 'Standard', img: 'sailboat', sub: 'For a couple of trips a month', feat: ['2 lifts per month included', 'Extra lifts $30 each', 'Free transfer with every lift', 'Fresh water hull wash down'] },
     unlimited: { title: 'Unlimited', img: 'hero-cruiser', flag: 'Most flexible', sub: 'Go whenever the weather’s right', feat: ['Unlimited lifts', 'Free transfer with every lift', 'Fresh water hull wash down', 'Engine flush on request'] },
   };
 
   async function load() {
-    const key = `${S.length}|${S.unit}|${S.start}`;
-    if (!cache.has(key)) cache.set(key, fetch(`/api/options?length=${encodeURIComponent(S.length)}&unit=${S.unit}&start=${S.start}`).then((r) => r.json()));
+    const key = `${S.length}|${S.unit}|${S.start}|${S.end}`;
+    if (!cache.has(key)) cache.set(key, fetch(`/api/options?length=${encodeURIComponent(S.length)}&unit=${S.unit}&start=${S.start}&end=${S.end}`).then((r) => r.json()));
     S.data = await cache.get(key);
     return S.data;
   }
@@ -155,10 +161,13 @@
     const v = {
       boat: d?.lengthM ? `${d.lengthM} m · ${d.lengthFt} ft${S.type ? ' ' + S.type.toLowerCase() : ''}` : 'Tell us your boat length',
       boatShort: d?.lengthM ? `${d.lengthM} m · ${d.lengthFt} ft` : '—',
-      start: d?.startLabel || '—', pkgLabel: c ? PK[c.pkg].title : '—', termLabel: c ? (c.term === 'annual' ? 'Annual (12 months)' : 'Monthly (3 mo min)') : '—',
+      start: d?.startLabel || '—',
+      dates: d?.startLabel ? `${d.startLabel} – ${(c ? c.endLabel : d.endLabel)}` : '—',
+      endLabel: c ? c.endLabel : (d?.endLabel || '—'),
+      pkgLabel: c ? PK[c.pkg].title : '—', termLabel: c ? `${c.term === 'annual' ? 'Annual' : 'Monthly'} · ${c.months} months` : '—',
       band: c ? c.band : '—', contract: c ? aud(c.contractValue) : '—', monthly: c ? aud(c.monthly) : '—', deposit: c ? aud(c.deposit) : '—',
       gstNote: c ? `Includes GST of ${aud(c.gstMonthly)}/month. First month billed on your start date.` : '',
-      s2sub: d?.lengthM ? `${d.lengthM} m boat · from ${d.startLabel} · prices include GST` : '',
+      s2sub: d?.lengthM ? `${d.lengthM} m boat · ${d.startLabel} – ${d.endLabel} (${d.stayMonths} months) · prices include GST` : '',
     };
     for (const el of $$('[data-bind]')) if (v[el.dataset.bind] !== undefined) el.textContent = v[el.dataset.bind];
   }
@@ -181,7 +190,7 @@
       else if (o.available > 0) { pill.className = 'pill warn'; pill.textContent = `Only ${o.available} left`; }
       else { pill.className = 'pill err'; pill.textContent = 'Fully booked'; }
       $('.pk-amt', n).textContent = aud(o.monthly);
-      $('.pk-total', n).textContent = `${aud(o.contractValue)} over ${o.months} months`;
+      $('.pk-total', n).textContent = `${aud(o.contractValue)} over ${o.months} months · ends ${o.endLabel}` + (o.extendsStay ? ' (12-month minimum)' : '');
       const btn = $('button', n);
       if (!o.available) { btn.textContent = 'Join waitlist'; btn.className = 'btn btn-outline btn-block'; btn.onclick = () => { S.pkg = o.pkg; go(3); $$('input[name=action]').find((x) => x.value === 'enquire').checked = true; updAction(); }; }
       else btn.onclick = () => { S.pkg = o.pkg; track('quote_started', { step: 'package_selected', package: o.pkg, term: o.term }); go(3); };
@@ -190,7 +199,7 @@
   }
 
   function syncUrl() {
-    const q = new URLSearchParams({ length: S.length, unit: S.unit, start: S.start, type: S.type });
+    const q = new URLSearchParams({ length: S.length, unit: S.unit, start: S.start, end: S.end, type: S.type });
     if (S.step >= 2) q.set('term', S.term);
     if (S.step === 3 && S.pkg) q.set('pkg', S.pkg);
     history.replaceState(null, '', '/book?' + q);
@@ -204,20 +213,21 @@
     $$('[data-panel]').forEach((p) => (p.hidden = Number(p.dataset.panel) !== step));
     $$('#steps li').forEach((li) => { const n = Number(li.dataset.step); li.className = n < step ? 'done' : n === step ? 'current' : ''; li.querySelector('.n').textContent = n < step ? '✓' : n; li.toggleAttribute('aria-current', n === step); });
     if (step === 2) { $$('input[name=tterm]').forEach((r) => (r.checked = r.value === S.term)); renderCards(); }
-    if (step === 3) { const f = $('#bookform'); f.lengthM.value = S.data.lengthM; f.pkg.value = S.pkg; f.term.value = S.term; f.start.value = S.data.start; f.type.value = S.type; }
+    if (step === 3) { const f = $('#bookform'); f.lengthM.value = S.data.lengthM; f.pkg.value = S.pkg; f.term.value = S.term; f.start.value = S.data.start; f.end.value = S.data.end; f.type.value = S.type; }
     bind(); syncUrl();
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   }
 
   // Step 1
   const f1 = $('#s1');
-  f1.length.value = S.length; f1.unit.value = S.unit; f1.start.value = S.start;
+  f1.length.value = S.length; f1.unit.value = S.unit; f1.start.value = S.start; fixEnd();
   $$('input[name=type]', f1).forEach((r) => (r.checked = r.value === S.type));
   let pre;
-  f1.addEventListener('input', () => { clearTimeout(pre); pre = setTimeout(() => { S.length = f1.length.value; S.unit = f1.unit.value; S.start = f1.start.value; if (S.length > 0) load().then(bind); }, 250); });
+  f1.addEventListener('input', () => { clearTimeout(pre); pre = setTimeout(() => { S.length = f1.length.value; S.unit = f1.unit.value; if (S.start !== f1.start.value) { S.start = f1.start.value; fixEnd(); } S.end = f1.end.value; if (S.length > 0) load().then(bind); }, 250); });
   f1.addEventListener('submit', (e) => {
     e.preventDefault();
-    S.length = f1.length.value; S.unit = f1.unit.value; S.start = f1.start.value; S.type = (f1.type.value || 'Runabout');
+    S.length = f1.length.value; S.unit = f1.unit.value; S.start = f1.start.value; S.end = f1.end.value; S.type = (f1.type.value || 'Runabout');
+    if (!S.end || S.end < addMonths(S.start, 3)) { const err = $('#s1err'); err.hidden = false; err.textContent = 'Choose an end date at least 3 months after the start date.'; return; }
     const m = S.unit === 'ft' ? S.length * 0.3048 : Number(S.length);
     const err = $('#s1err');
     if (!(m > 0 && m <= 30)) { err.hidden = false; err.textContent = 'Enter a boat length between 1 and 30 metres (or 3 and 98 feet).'; return; }

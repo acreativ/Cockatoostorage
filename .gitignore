@@ -3,3 +3,8 @@ data/
 uploads/*
 !uploads/.gitkeep
 .env
+.env*.local
+.vercel
+.agents/
+skills-lock.json
+.claude/

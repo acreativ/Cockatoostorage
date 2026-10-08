@@ -5,7 +5,12 @@ const { open, helpers } = require('./src/db');
 const C = require('./src/core');
 const S = require('./src/services');
 
-const DB_FILE = process.env.DB_FILE || path.join(__dirname, 'data', 'cockatoo.db');
+// On Vercel the deployment is read-only; only /tmp is writable (and resets between cold starts).
+const ON_VERCEL = !!process.env.VERCEL;
+const RUNTIME_DIR = ON_VERCEL ? '/tmp' : __dirname;
+const DB_FILE = process.env.DB_FILE || path.join(RUNTIME_DIR, 'data', 'cockatoo.db');
+process.env.UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(RUNTIME_DIR, 'uploads');
+fs.mkdirSync(process.env.UPLOAD_DIR, { recursive: true });
 const h = fs.existsSync(DB_FILE) ? helpers(open(DB_FILE)) : require('./src/seed').seed(DB_FILE);
 const SECRET = process.env.SESSION_SECRET || 'dev-only-secret-change-me';
 
@@ -42,7 +47,7 @@ app.use((req, res, next) => {
   res.locals.biz = { name: h.setting('business_name'), phone: h.setting('phone'), address: h.setting('address'), abn: h.setting('abn') };
   next();
 });
-app.use('/uploads', (req, res, next) => (req.user ? next() : res.status(403).end()), express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', (req, res, next) => (req.user ? next() : res.status(403).end()), express.static(process.env.UPLOAD_DIR));
 app.locals.login = (res, user) => {
   const val = C.sign(`${user.id}:${Date.now() + 12 * 3600e3}`, SECRET);
   res.append('Set-Cookie', `cm_sess=${encodeURIComponent(val)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
@@ -64,5 +69,8 @@ app.use((err, req, res, next) => {
 setInterval(() => S.expireHolds(h), 60e3).unref();
 setInterval(() => { try { S.runScheduledJobs(h); } catch (e) { console.error('jobs', e); } }, 15 * 60e3).unref();
 
-const port = Number(process.env.PORT || 3000);
-app.listen(port, () => console.log(`Cockatoo Marine running on http://localhost:${port}`));
+module.exports = app; // Vercel imports the app; locally we listen on a port.
+if (!ON_VERCEL) {
+  const port = Number(process.env.PORT || 3000);
+  app.listen(port, () => console.log(`Cockatoo Marine running on http://localhost:${port}`));
+}

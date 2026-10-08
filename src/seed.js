@@ -20,7 +20,7 @@ function seed(dbFile) {
     staff_email: ['office@cockatoomarine.example', 1], admin_email: ['admin@cockatoomarine.example', 1],
     deposit_type: ['fixed', 1], deposit_value: ['250', 1], hold_minutes: ['30', 0], pending_days: ['3', 0],
     lift_hours: ['07:00-16:00', 1], lift_slot_minutes: ['60', 1], lift_slot_capacity: ['2', 1], lift_blackouts: [C.addDays(today, 10), 1],
-    tc_version: ['v1-draft', 1], base_url: [process.env.BASE_URL || 'http://localhost:3000', 0],
+    tc_version: ['v1-draft', 1], base_url: [process.env.BASE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:3000'), 0],
   };
   for (const [k, [v, p]] of Object.entries(settings)) h.run('INSERT INTO settings (key,value,placeholder) VALUES (?,?,?)', k, v, p);
 

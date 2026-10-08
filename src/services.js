@@ -39,8 +39,14 @@ function getQuote(h, input) {
 }
 
 // ---------- Availability ----------
+// The booking ends on the customer's chosen date, but never before the term minimum (3 months monthly, 12 annual).
+function stayEnd(start, term, end) {
+  const min = C.addMonths(start, term === 'annual' ? 12 : 3);
+  return end && end > min ? end : min;
+}
 function bookingEnd(start, term, months) {
-  return C.addMonths(start, term === 'annual' ? 12 : Math.max(3, Number(months) || 3));
+  const min = term === 'annual' ? 12 : 3;
+  return C.addMonths(start, Math.max(min, Number(months) || min));
 }
 function availableBays(h, lengthM, start, end) {
   return h.all(`
@@ -303,7 +309,7 @@ function dailyDigest(h, today, due) {
 }
 
 module.exports = {
-  ACTIVE, audit, notify, providers, getQuote, depositOpts, bookingEnd, availableBays, createBooking, updateBooking,
+  ACTIVE, audit, notify, providers, getQuote, depositOpts, bookingEnd, stayEnd, availableBays, createBooking, updateBooking,
   upsertCustomer, createLead, screenWatchlist, confirmBooking, createInvoice, recordPayment, runMonthlyInvoicing,
   liftSlots, bookLift, expireHolds, runScheduledJobs, newRef,
 };

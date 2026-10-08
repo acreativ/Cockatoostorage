@@ -10,7 +10,7 @@
     "test": "node --test test/*.test.js"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": "24.x"
   },
   "dependencies": {
     "ejs": "^7.0.1",

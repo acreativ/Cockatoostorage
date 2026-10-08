@@ -24,13 +24,18 @@
     const upd = async () => {
       const fd = new FormData(form);
       if (!fd.get('length')) { out.innerHTML = '<span class="muted small">Enter your boat length to see a price</span>'; return; }
-      const qs = new URLSearchParams({ length: fd.get('length'), unit: fd.get('unit') || 'm', pkg: fd.get('pref') || fd.get('pkg') || 'standard', term: fd.get('term') || 'annual', start: fd.get('start') || '' });
+      const qs = new URLSearchParams({ length: fd.get('length'), unit: fd.get('unit') || 'm', start: fd.get('start') || '', end: fd.get('end') || '' });
+      const pkg = fd.get('pref') || fd.get('pkg') || 'standard', term = fd.get('term') || 'annual';
       try {
-        const r = await fetch('/api/quote?' + qs); const j = await r.json();
-        if (j.error) { out.innerHTML = '<span class="small">' + j.error + '</span>'; return; }
-        out.innerHTML = '<span><span class="small muted">' + (j.available ? j.available + ' bays free' : 'Waitlist only') + ' · ' + j.band + '</span></span><span><strong>$' + j.monthly.toLocaleString('en-AU') + '</strong><span class="small muted">/month</span></span>';
+        const r = await fetch('/api/options?' + qs); const d = await r.json();
+        const j = (d.options || []).find((o) => o.pkg === pkg && o.term === term);
+        if (d.error || !j) { out.innerHTML = '<span class="small">' + (d.error || 'Enter your boat length to see a price') + '</span>'; return; }
+        out.innerHTML = '<span><span class="small muted">' + (j.available ? j.available + ' bays free' : 'Waitlist only') + ' · ' + j.months + ' months</span></span><span><strong>$' + j.monthly.toLocaleString('en-AU') + '</strong><span class="small muted">/month</span></span>';
       } catch { out.textContent = ''; }
     };
+    const addM = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = new Date(Date.UTC(y, m - 1 + n, 1)); x.setUTCDate(Math.min(d, new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth() + 1, 0)).getUTCDate())); return x.toISOString().slice(0, 10); };
+    const st = form.querySelector('[name=start]'), en = form.querySelector('[name=end]');
+    if (st && en) st.addEventListener('change', () => { en.min = addM(st.value, 3); if (en.value < en.min) en.value = addM(st.value, 12); });
     let t; form.addEventListener('input', () => { clearTimeout(t); t = setTimeout(upd, 200); });
     upd();
   });

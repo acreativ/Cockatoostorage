@@ -7,9 +7,10 @@ const login = async (e) => (await post('/login', { email: e, password: 'demo1234
 const flashOf = (r) => decodeURIComponent((r.headers.getSetCookie().find((c) => c.startsWith('cm_flash=')) || '').split(';')[0].slice(9));
 const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) process.exitCode = 1; };
 const start = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
+const end = new Date(Date.now() + 200 * 864e5).toISOString().slice(0, 10);
 
 // 1. Public bank-transfer booking -> pending; office marks deposit paid -> confirmed
-let r = await post('/book', { lengthM: 5.5, pkg: 'standard', term: 'monthly', start, action: 'bank', terms: 'yes', name: 'Flow Tester', email: 'flow@example.com', phone: '0400 000 999', make_model: 'Test 550' });
+let r = await post('/book', { lengthM: 5.5, pkg: 'standard', term: 'monthly', start, end, action: 'bank', terms: 'yes', name: 'Flow Tester', email: 'flow@example.com', phone: '0400 000 999', make_model: 'Test 550' });
 const ref = r.headers.get('location').split('/')[2].split('?')[0];
 ok(r.status === 302 && /pending payment|awaiting your reservation fee/i.test(await get(`/booking/${ref}`)), 'bank booking is pending: ' + ref);
 const office = await login('office@cockatoo.test');

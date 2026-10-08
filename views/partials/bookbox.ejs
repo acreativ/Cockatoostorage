@@ -2,11 +2,12 @@
 <form class="bookbox" action="/book" method="get" data-live-quote onsubmit="track('quote_started',{location:'<%= locals.where || 'hero' %>'})">
   <h2>Price your storage</h2>
   <p class="sub">Instant monthly rate and live bay availability.</p>
+  <div class="field"><label for="bb-length">Boat length</label>
+    <div class="unit-input"><input id="bb-length" name="length" type="number" inputmode="decimal" step="0.1" min="1" max="30" placeholder="e.g. 6.2" required>
+    <select name="unit" aria-label="Length unit"><option value="m">m</option><option value="ft">ft</option></select></div></div>
   <div class="row">
-    <div class="field"><label for="bb-length">Boat length</label>
-      <div class="unit-input"><input id="bb-length" name="length" type="number" inputmode="decimal" step="0.1" min="1" max="30" placeholder="e.g. 6.2" required>
-      <select name="unit" aria-label="Length unit"><option value="m">m</option><option value="ft">ft</option></select></div></div>
     <div class="field"><label for="bb-start">Start date</label><input id="bb-start" name="start" type="date" min="<%= today %>" value="<%= C.addDays(today, 7) %>"></div>
+    <div class="field"><label for="bb-end">End date</label><input id="bb-end" name="end" type="date" min="<%= C.addMonths(C.addDays(today, 7), 3) %>" value="<%= C.addMonths(C.addDays(today, 7), 12) %>"></div>
   </div>
   <div class="field"><span class="label" id="bb-pkg">Launch package</span>
     <div class="seg" role="radiogroup" aria-labelledby="bb-pkg"><input type="radio" id="p-s" name="pref" value="standard" checked><label for="p-s">Standard</label><input type="radio" id="p-u" name="pref" value="unlimited"><label for="p-u">Unlimited</label></div></div>

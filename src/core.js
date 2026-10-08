@@ -19,6 +19,12 @@ function addMonths(s, n) {
   const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
   d.setUTCDate(Math.min(day, last)); return iso(d);
 }
+// Whole months needed to cover start → end (rounded up), e.g. 15 Oct → 20 Jan = 4.
+function monthsCovering(start, end) {
+  let n = 0;
+  while (addMonths(start, n) < end && n < 600) n++;
+  return n;
+}
 function daysBetween(a, b) { return Math.round((parse(b) - parse(a)) / 86400000); }
 function monthStart(s) { return s.slice(0, 7) + '-01'; }
 function fmtDate(s) {
@@ -53,7 +59,7 @@ function quote(rates, { lengthM, pkg, term, months }, opts = {}) {
   if (!['standard', 'unlimited'].includes(pkg)) throw new Error('Choose a launch package.');
   if (!['annual', 'monthly'].includes(term)) throw new Error('Choose a contract term.');
   const minMonths = TERM_MONTHS[term];
-  const m = term === 'annual' ? 12 : Math.max(minMonths, Number(months) || minMonths);
+  const m = Math.max(minMonths, Number(months) || minMonths); // annual: 12+ months, monthly: 3+ months
   if (term === 'monthly' && Number(months) && Number(months) < minMonths) throw new Error('Monthly storage has a 3-month minimum.');
   const rate = findRate(rates, lengthM, pkg, term);
   if (!rate) throw new Error('We need to quote this length individually. Send an enquiry and we will get back to you.');
@@ -168,7 +174,7 @@ function unsign(signed, secret) {
 const render = (tpl, vars) => (tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] ?? ''));
 
 module.exports = {
-  TZ, todaySyd, nowSydLabel, addDays, addMonths, daysBetween, monthStart, fmtDate, fmtDateTime,
+  TZ, todaySyd, nowSydLabel, addDays, addMonths, monthsCovering, daysBetween, monthStart, fmtDate, fmtDateTime,
   round2, gstOf, aud, TERM_MONTHS, ftToM, mToFt, findRate, quote,
   INCLUDED_LIFTS, EXTRA_LIFT_FEE, isExtraLift, buildInvoice,
   normPhone, normId, nameSimilarity, matchWatchlist, verifyStripeSignature,
