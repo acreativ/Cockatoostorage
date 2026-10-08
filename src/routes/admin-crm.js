@@ -8,12 +8,12 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
   const bookingLink = (b) => html`<a href="/admin/bookings/${b.id}">${b.ref}</a>`;
 
   // ======================= CUSTOMERS =======================
-  r.get('/customers', (req, res) => {
+  r.get('/customers', async (req, res) => {
     const q = `%${req.query.q || ''}%`;
-    const rows = h.all(`SELECT c.*, (SELECT COUNT(*) FROM boats b WHERE b.customer_id=c.id) boats,
+    const rows = await h.all(`SELECT c.*, (SELECT COUNT(*) FROM boats b WHERE b.customer_id=c.id) boats,
       (SELECT COALESCE(SUM(total-paid),0) FROM invoices i WHERE i.customer_id=c.id AND i.status IN ('issued','overdue')) owing
       FROM customers c WHERE c.name LIKE ? OR c.email LIKE ? OR c.phone LIKE ? OR c.company LIKE ? ORDER BY c.name`, q, q, q, q);
-    page(req, res, 'Customers', html`<form class="filters"><input type="search" name="q" placeholder="Search name, email, phone" value="${req.query.q || ''}" aria-label="Search"><button class="btn btn-brand btn-sm">Search</button></form>
+    await page(req, res, 'Customers', html`<form class="filters"><input type="search" name="q" placeholder="Search name, email, phone" value="${req.query.q || ''}" aria-label="Search"><button class="btn btn-brand btn-sm">Search</button></form>
       <div class="card">${table([{ h: 'Name', f: (c) => html`<a href="/admin/customers/${c.id}">${c.name}</a>` }, { h: 'Type', f: (c) => label(c.kind) }, { h: 'Email', k: 'email' }, { h: 'Phone', k: 'phone' },
         { h: 'Source', k: 'source' }, { h: 'Boats', k: 'boats', num: 1 }, { h: 'Owing', num: 1, f: (c) => c.owing > 0 ? money(c.owing) : '—' }], rows)}</div>`,
       { actions: can(req.user, 'admin', 'office') ? html`<a class="btn btn-brand btn-sm" href="/admin/customers/new">Add customer</a>` : '' });
@@ -29,36 +29,36 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
     ${field('tags', 'Tags (comma separated)', { value: c.tags })}${field('notes', 'Notes', { type: 'textarea', value: c.notes })}`;
   const CUST_COLS = ['kind', 'source', 'name', 'company', 'email', 'phone', 'address', 'billing_address', 'abn', 'id_notes', 'tags', 'notes'];
 
-  r.get('/customers/new', (req, res) => page(req, res, 'Add customer', html`<form class="card" method="post" action="/admin/customers" style="max-width:760px">${custForm()}<button class="btn btn-brand">Save customer</button></form>`, { active: '/admin/customers' }));
-  r.post('/customers', (req, res) => {
+  r.get('/customers/new', async (req, res) => await page(req, res, 'Add customer', html`<form class="card" method="post" action="/admin/customers" style="max-width:760px">${custForm()}<button class="btn btn-brand">Save customer</button></form>`, { active: '/admin/customers' }));
+  r.post('/customers', async (req, res) => {
     if (!req.body.name) return back(req, res, 'Enter a name.');
-    const x = h.run(`INSERT INTO customers (${CUST_COLS}) VALUES (${CUST_COLS.map(() => '?')})`, ...CUST_COLS.map((k) => req.body[k] || null));
+    const x = await h.run(`INSERT INTO customers (${CUST_COLS}) VALUES (${CUST_COLS.map(() => '?')})`, ...CUST_COLS.map((k) => req.body[k] || null));
     const id = Number(x.lastInsertRowid);
-    S.audit(h, req.user, 'create', 'customer', id);
-    S.screenWatchlist(h, 'customer', id, req.body);
+    await S.audit(h, req.user, 'create', 'customer', id);
+    await S.screenWatchlist(h, 'customer', id, req.body);
     flash(res, 'Customer saved.'); res.redirect('/admin/customers/' + id);
   });
-  r.post('/customers/:id', (req, res) => {
+  r.post('/customers/:id', async (req, res) => {
     if (!can(req.user, 'admin', 'office')) return back(req, res, 'Not allowed.');
-    h.run(`UPDATE customers SET ${CUST_COLS.map((k) => k + '=?')} WHERE id=?`, ...CUST_COLS.map((k) => req.body[k] || null), req.params.id);
-    S.audit(h, req.user, 'update', 'customer', Number(req.params.id));
+    await h.run(`UPDATE customers SET ${CUST_COLS.map((k) => k + '=?')} WHERE id=?`, ...CUST_COLS.map((k) => req.body[k] || null), req.params.id);
+    await S.audit(h, req.user, 'update', 'customer', Number(req.params.id));
     flash(res, 'Customer updated.'); res.redirect('/admin/customers/' + req.params.id);
   });
 
-  r.get('/customers/:id', (req, res, next) => {
-    const c = h.get('SELECT * FROM customers WHERE id=?', req.params.id);
+  r.get('/customers/:id', async (req, res, next) => {
+    const c = await h.get('SELECT * FROM customers WHERE id=?', req.params.id);
     if (!c) return next();
     const tab = req.query.tab || 'overview';
-    const boats = h.all('SELECT * FROM boats WHERE customer_id=?', c.id);
-    const bookings = h.all('SELECT b.*, bay.code FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE customer_id=? ORDER BY start_date DESC', c.id);
-    const inv = h.all('SELECT * FROM invoices WHERE customer_id=? ORDER BY issue_date DESC', c.id);
-    const pays = h.all('SELECT * FROM payments WHERE customer_id=? ORDER BY paid_on DESC', c.id);
-    const leads = h.all('SELECT * FROM leads WHERE customer_id=? ORDER BY created_at DESC', c.id);
-    const contracts = h.all('SELECT * FROM contracts WHERE customer_id=? ORDER BY start_date DESC', c.id);
-    const lifts = h.all('SELECT l.* FROM lifts l JOIN bookings b ON b.id=l.booking_id WHERE b.customer_id=? ORDER BY date DESC', c.id);
-    const checks = h.all('SELECT k.*, bt.name boat FROM checklists k JOIN boats bt ON bt.id=k.boat_id WHERE k.customer_id=? ORDER BY k.created_at DESC', c.id);
-    const comms = h.all('SELECT cm.*, u.name uname FROM communications cm LEFT JOIN users u ON u.id=cm.user_id WHERE cm.customer_id=? ORDER BY created_at DESC', c.id);
-    const mail = h.all('SELECT * FROM outbox WHERE customer_id=? OR recipient=? ORDER BY created_at DESC', c.id, c.email || '-');
+    const boats = await h.all('SELECT * FROM boats WHERE customer_id=?', c.id);
+    const bookings = await h.all('SELECT b.*, bay.code FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE customer_id=? ORDER BY start_date DESC', c.id);
+    const inv = await h.all('SELECT * FROM invoices WHERE customer_id=? ORDER BY issue_date DESC', c.id);
+    const pays = await h.all('SELECT * FROM payments WHERE customer_id=? ORDER BY paid_on DESC', c.id);
+    const leads = await h.all('SELECT * FROM leads WHERE customer_id=? ORDER BY created_at DESC', c.id);
+    const contracts = await h.all('SELECT * FROM contracts WHERE customer_id=? ORDER BY start_date DESC', c.id);
+    const lifts = await h.all('SELECT l.* FROM lifts l JOIN bookings b ON b.id=l.booking_id WHERE b.customer_id=? ORDER BY date DESC', c.id);
+    const checks = await h.all('SELECT k.*, bt.name boat FROM checklists k JOIN boats bt ON bt.id=k.boat_id WHERE k.customer_id=? ORDER BY k.created_at DESC', c.id);
+    const comms = await h.all('SELECT cm.*, u.name uname FROM communications cm LEFT JOIN users u ON u.id=cm.user_id WHERE cm.customer_id=? ORDER BY created_at DESC', c.id);
+    const mail = await h.all('SELECT * FROM outbox WHERE customer_id=? OR recipient=? ORDER BY created_at DESC', c.id, c.email || '-');
     const owing = inv.filter((i) => ['issued', 'overdue'].includes(i.status)).reduce((s, i) => s + i.total - i.paid, 0);
     const tabs = [['overview', 'Overview'], ['bookings', `Bookings (${bookings.length})`], ['billing', `Invoices & payments (${inv.length})`], ['activity', 'Lifts & checklists'], ['comms', `Communications (${comms.length + mail.length})`], ['edit', 'Edit']];
     let body;
@@ -78,11 +78,11 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
       <div class="card"><h2>Logged contact</h2>${table([{ h: 'When', f: (x) => dt(x.created_at) }, { h: 'Channel', k: 'channel' }, { h: 'Dir', k: 'direction' }, { h: 'Summary', k: 'summary' }, { h: 'By', k: 'uname' }], comms)}</div>
       <div class="card"><h2>Emails sent</h2>${table([{ h: 'When', f: (x) => dt(x.created_at) }, { h: 'Subject', f: (x) => html`<a href="/admin/outbox/${x.id}">${x.subject}</a>` }], mail)}</div>`;
     if (tab === 'edit') body = html`<form class="card" method="post" action="/admin/customers/${c.id}" style="max-width:760px">${custForm(c)}<button class="btn btn-brand">Save changes</button></form>`;
-    page(req, res, c.name, html`<nav class="tabs">${tabs.map(([k, l]) => html`<a href="?tab=${k}" ${raw(k === tab ? 'aria-current="page"' : '')}>${l}</a>`)}</nav>${body}`,
+    await page(req, res, c.name, html`<nav class="tabs">${tabs.map(([k, l]) => html`<a href="?tab=${k}" ${raw(k === tab ? 'aria-current="page"' : '')}>${l}</a>`)}</nav>${body}`,
       { active: '/admin/customers', actions: html`<a class="btn btn-outline btn-sm" href="/admin/bookings/new?customer=${c.id}">New booking</a>` });
   });
-  r.post('/customers/:id/comm', (req, res) => {
-    h.run('INSERT INTO communications (customer_id,channel,direction,summary,user_id) VALUES (?,?,?,?,?)', req.params.id, req.body.channel, req.body.direction, req.body.summary, req.user.id);
+  r.post('/customers/:id/comm', async (req, res) => {
+    await h.run('INSERT INTO communications (customer_id,channel,direction,summary,user_id) VALUES (?,?,?,?,?)', req.params.id, req.body.channel, req.body.direction, req.body.summary, req.user.id);
     flash(res, 'Contact logged.'); res.redirect(`/admin/customers/${req.params.id}?tab=comms`);
   });
 
@@ -96,55 +96,55 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
     <div class="row">${field('trailer', 'Trailer', { options: [['0', 'No'], ['1', 'Yes']], value: String(b.trailer ?? 0) })}${field('trailer_details', 'Trailer details / rego', { value: b.trailer_details })}</div>
     <div class="row-3">${field('insurer', 'Insurer', { value: b.insurer })}${field('insurance_policy', 'Policy #', { value: b.insurance_policy })}${field('insurance_expiry', 'Insurance expiry', { type: 'date', value: b.insurance_expiry })}</div>`;
 
-  r.get('/boats', (req, res) => {
+  r.get('/boats', async (req, res) => {
     const q = `%${req.query.q || ''}%`;
-    const rows = h.all(`SELECT bt.*, c.name owner, (SELECT bay.code FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE b.boat_id=bt.id AND b.status IN ('confirmed','active') ORDER BY b.start_date DESC LIMIT 1) bay
+    const rows = await h.all(`SELECT bt.*, c.name owner, (SELECT bay.code FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE b.boat_id=bt.id AND b.status IN ('confirmed','active') ORDER BY b.start_date DESC LIMIT 1) bay
       FROM boats bt LEFT JOIN customers c ON c.id=bt.customer_id WHERE bt.name LIKE ? OR bt.make_model LIKE ? OR bt.rego LIKE ? OR bt.hin LIKE ? OR c.name LIKE ? ORDER BY bt.name`, q, q, q, q, q);
-    page(req, res, 'Boats', html`<form class="filters"><input type="search" name="q" placeholder="Search boat, rego, HIN, owner" value="${req.query.q || ''}" aria-label="Search"><button class="btn btn-brand btn-sm">Search</button></form>
+    await page(req, res, 'Boats', html`<form class="filters"><input type="search" name="q" placeholder="Search boat, rego, HIN, owner" value="${req.query.q || ''}" aria-label="Search"><button class="btn btn-brand btn-sm">Search</button></form>
       <div class="card">${table([{ h: 'Boat', f: (b) => html`<a href="/admin/boats/${b.id}">${b.name}</a>` }, { h: 'Make / model', k: 'make_model' }, { h: 'Length', f: (b) => b.length_m + ' m' }, { h: 'Owner', k: 'owner' }, { h: 'Bay', f: (b) => b.bay || '—' }, { h: 'Rego', k: 'rego' }, { h: 'Insurance', f: (b) => b.insurance_expiry ? html`${d(b.insurance_expiry)} ${b.insurance_expiry < today() ? pill('err', 'Expired') : b.insurance_expiry < C.addDays(today(), 30) ? pill('warn', 'Due') : ''}` : '—' }], rows)}</div>`);
   });
-  r.get('/boats/new', (req, res) => page(req, res, 'Add boat', html`<form class="card" method="post" action="/admin/boats" style="max-width:760px">
-    ${field('customer_id', 'Owner', { options: [['', 'Select…'], ...h.all('SELECT id,name FROM customers ORDER BY name').map((c) => [c.id, c.name])], value: req.query.customer, required: true })}${boatForm()}<button class="btn btn-brand">Save boat</button></form>`, { active: '/admin/boats' }));
-  r.post('/boats', (req, res) => {
+  r.get('/boats/new', async (req, res) => await page(req, res, 'Add boat', html`<form class="card" method="post" action="/admin/boats" style="max-width:760px">
+    ${field('customer_id', 'Owner', { options: [['', 'Select…'], ...(await h.all('SELECT id,name FROM customers ORDER BY name')).map((c) => [c.id, c.name])], value: req.query.customer, required: true })}${boatForm()}<button class="btn btn-brand">Save boat</button></form>`, { active: '/admin/boats' }));
+  r.post('/boats', async (req, res) => {
     if (!req.body.customer_id || !(Number(req.body.length_m) > 0)) return back(req, res, 'Choose an owner and enter the length.');
-    const x = h.run(`INSERT INTO boats (customer_id,${BOAT_COLS},qr_token) VALUES (?,${BOAT_COLS.map(() => '?')},?)`, req.body.customer_id, ...BOAT_COLS.map((k) => req.body[k] || null), crypto.randomBytes(12).toString('base64url'));
+    const x = await h.run(`INSERT INTO boats (customer_id,${BOAT_COLS},qr_token) VALUES (?,${BOAT_COLS.map(() => '?')},?)`, req.body.customer_id, ...BOAT_COLS.map((k) => req.body[k] || null), crypto.randomBytes(12).toString('base64url'));
     const id = Number(x.lastInsertRowid);
-    S.audit(h, req.user, 'create', 'boat', id);
-    S.screenWatchlist(h, 'boat', id, { rego: req.body.rego, hin: req.body.hin });
+    await S.audit(h, req.user, 'create', 'boat', id);
+    await S.screenWatchlist(h, 'boat', id, { rego: req.body.rego, hin: req.body.hin });
     flash(res, 'Boat saved.'); res.redirect('/admin/boats/' + id);
   });
-  r.post('/boats/:id', (req, res) => {
-    h.run(`UPDATE boats SET ${BOAT_COLS.map((k) => k + '=?')} WHERE id=?`, ...BOAT_COLS.map((k) => req.body[k] || null), req.params.id);
-    S.audit(h, req.user, 'update', 'boat', Number(req.params.id));
+  r.post('/boats/:id', async (req, res) => {
+    await h.run(`UPDATE boats SET ${BOAT_COLS.map((k) => k + '=?')} WHERE id=?`, ...BOAT_COLS.map((k) => req.body[k] || null), req.params.id);
+    await S.audit(h, req.user, 'update', 'boat', Number(req.params.id));
     flash(res, 'Boat updated.'); res.redirect('/admin/boats/' + req.params.id);
   });
-  r.post('/boats/:id/files', upload.array('files', 10), (req, res) => {
-    const b = h.get('SELECT * FROM boats WHERE id=?', req.params.id);
+  r.post('/boats/:id/files', upload.array('files', 10), async (req, res) => {
+    const b = await h.get('SELECT * FROM boats WHERE id=?', req.params.id);
     const docs = JSON.parse(b.docs || '[]');
     for (const f of req.files || []) docs.push({ name: f.originalname, path: '/uploads/' + f.filename, at: new Date().toISOString() });
     const photo = req.body.as_photo && req.files?.[0] ? '/uploads/' + req.files[0].filename : b.photo;
-    h.run('UPDATE boats SET docs=?, photo=? WHERE id=?', JSON.stringify(docs), photo, b.id);
-    S.audit(h, req.user, 'upload', 'boat', b.id, { files: (req.files || []).map((f) => f.originalname) });
+    await h.run('UPDATE boats SET docs=?, photo=? WHERE id=?', JSON.stringify(docs), photo, b.id);
+    await S.audit(h, req.user, 'upload', 'boat', b.id, { files: (req.files || []).map((f) => f.originalname) });
     flash(res, `${(req.files || []).length} file(s) uploaded.`); res.redirect('/admin/boats/' + b.id);
   });
 
-  const boatData = (id) => {
-    const b = h.get('SELECT bt.*, c.name owner, c.phone, c.email FROM boats bt LEFT JOIN customers c ON c.id=bt.customer_id WHERE bt.id=?', id);
+  const boatData = async (id) => {
+    const b = await h.get('SELECT bt.*, c.name owner, c.phone, c.email FROM boats bt LEFT JOIN customers c ON c.id=bt.customer_id WHERE bt.id=?', id);
     if (!b) return null;
-    b.booking = h.get(`SELECT b.*, bay.code, bay.zone FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE b.boat_id=? AND b.status IN ('confirmed','active','pending') ORDER BY start_date DESC LIMIT 1`, id);
+    b.booking = await h.get(`SELECT b.*, bay.code, bay.zone FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE b.boat_id=? AND b.status IN ('confirmed','active','pending') ORDER BY start_date DESC LIMIT 1`, id);
     b.qrUrl = `${h.setting('base_url')}/q/${b.qr_token}`;
     return b;
   };
 
   r.get('/boats/:id', async (req, res, next) => {
-    const b = boatData(req.params.id);
+    const b = await boatData(req.params.id);
     if (!b) return next();
     const qr = await QRCode.toDataURL(b.qrUrl, { margin: 1, width: 360, color: { dark: '#17414E' } });
-    const checks = h.all('SELECT k.*, u.name staff FROM checklists k LEFT JOIN users u ON u.id=k.staff_id WHERE boat_id=? ORDER BY created_at DESC', b.id);
-    const lifts = h.all('SELECT * FROM lifts WHERE boat_id=? ORDER BY date DESC LIMIT 15', b.id);
-    const jobs = h.all('SELECT * FROM service_jobs WHERE boat_id=? ORDER BY created_at DESC', b.id);
+    const checks = await h.all('SELECT k.*, u.name staff FROM checklists k LEFT JOIN users u ON u.id=k.staff_id WHERE boat_id=? ORDER BY created_at DESC', b.id);
+    const lifts = await h.all('SELECT * FROM lifts WHERE boat_id=? ORDER BY date DESC LIMIT 15', b.id);
+    const jobs = await h.all('SELECT * FROM service_jobs WHERE boat_id=? ORDER BY created_at DESC', b.id);
     const docs = JSON.parse(b.docs || '[]');
-    const out = h.get(`SELECT * FROM checklists r WHERE r.boat_id=? AND r.type='release' AND NOT EXISTS (SELECT 1 FROM checklists x WHERE x.release_id=r.id) ORDER BY created_at DESC LIMIT 1`, b.id);
+    const out = await h.get(`SELECT * FROM checklists r WHERE r.boat_id=? AND r.type='release' AND NOT EXISTS (SELECT 1 FROM checklists x WHERE x.release_id=r.id) ORDER BY created_at DESC LIMIT 1`, b.id);
     const body = html`
       ${req.query.scan ? html`<div class="alert info">Opened from QR scan. Pick a quick action below.</div>` : ''}
       <div class="card"><h2>Quick actions ${out ? pill('warn', 'Out on the water since ' + dt(out.created_at)) : pill('ok', 'In the yard')}</h2>
@@ -172,16 +172,16 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
       <div class="cols"><div class="card"><h2>Lifts</h2>${table([{ h: 'Date', f: (l) => d(l.date) }, { h: 'Slot', k: 'slot' }, { h: '', f: (l) => html`${l.is_extra ? pill('warn', 'Extra') : ''} ${pill(l.status === 'booked' ? 'booked_lift' : l.status, label(l.status))}` }], lifts)}</div>
       <div class="card"><h2>Service jobs</h2>${table([{ h: 'Job', f: (j) => html`<a href="/admin/services/${j.id}">${label(j.service)}: ${j.description}</a>` }, { h: 'Status', f: (j) => pill(j.status) }], jobs)}</div></div>
       <details class="card"><summary><b>Edit boat details</b></summary><form method="post" action="/admin/boats/${b.id}" style="margin-top:14px">${boatForm(b)}<button class="btn btn-brand">Save</button></form></details>`;
-    page(req, res, b.name, body, { active: '/admin/boats' });
+    await page(req, res, b.name, body, { active: '/admin/boats' });
   });
 
   // Printable "birth certificate"
   r.get('/boats/:id/sheet', async (req, res, next) => {
-    const b = boatData(req.params.id);
+    const b = await boatData(req.params.id);
     if (!b) return next();
     const qr = await QRCode.toDataURL(b.qrUrl, { margin: 1, width: 400, color: { dark: '#17414E' } });
     const biz = res.locals.biz;
-    page(req, res, 'Boat info sheet', html`
+    await page(req, res, 'Boat info sheet', html`
       <div class="no-print" style="margin-bottom:12px"><button class="btn btn-brand btn-sm" onclick="window.print()">Print / save PDF</button></div>
       <div class="card" style="max-width:820px">
         <div style="display:flex;justify-content:space-between;align-items:start;gap:20px;border-bottom:3px solid var(--brand);padding-bottom:14px;margin-bottom:18px">
@@ -202,25 +202,25 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
   });
 
   // ======================= CHECKLISTS =======================
-  r.get('/checklists', (req, res) => {
-    const rows = h.all('SELECT k.*, bt.name boat, u.name staff, c.name cname FROM checklists k JOIN boats bt ON bt.id=k.boat_id LEFT JOIN users u ON u.id=k.staff_id LEFT JOIN customers c ON c.id=k.customer_id ORDER BY k.created_at DESC LIMIT 200');
-    page(req, res, 'Checklists', html`<div class="card">${table([{ h: 'When', f: (k) => html`<a href="/admin/checklists/${k.id}">${dt(k.created_at)}</a>` }, { h: 'Type', f: (k) => pill(k.type === 'release' ? 'warn' : k.type === 'return' ? 'info' : 'ok', label(k.type)) }, { h: 'Boat', k: 'boat' }, { h: 'Customer', k: 'cname' }, { h: 'Staff', k: 'staff' }, { h: 'Fails', num: 1, f: (k) => Object.values(JSON.parse(k.results || '{}')).filter((v) => v.status === 'fail').length || '—' }], rows)}</div>`,
+  r.get('/checklists', async (req, res) => {
+    const rows = await h.all('SELECT k.*, bt.name boat, u.name staff, c.name cname FROM checklists k JOIN boats bt ON bt.id=k.boat_id LEFT JOIN users u ON u.id=k.staff_id LEFT JOIN customers c ON c.id=k.customer_id ORDER BY k.created_at DESC LIMIT 200');
+    await page(req, res, 'Checklists', html`<div class="card">${table([{ h: 'When', f: (k) => html`<a href="/admin/checklists/${k.id}">${dt(k.created_at)}</a>` }, { h: 'Type', f: (k) => pill(k.type === 'release' ? 'warn' : k.type === 'return' ? 'info' : 'ok', label(k.type)) }, { h: 'Boat', k: 'boat' }, { h: 'Customer', k: 'cname' }, { h: 'Staff', k: 'staff' }, { h: 'Fails', num: 1, f: (k) => Object.values(JSON.parse(k.results || '{}')).filter((v) => v.status === 'fail').length || '—' }], rows)}</div>`,
       { actions: html`<a class="btn btn-brand btn-sm" href="/admin/checklists/new">New checklist</a><a class="btn btn-outline btn-sm" href="/admin/checklists/templates">Templates</a>` });
   });
 
-  r.get('/checklists/new', (req, res) => {
+  r.get('/checklists/new', async (req, res) => {
     const type = ['checkin', 'release', 'return'].includes(req.query.type) ? req.query.type : null;
-    const boat = req.query.boat ? h.get('SELECT bt.*, c.name owner FROM boats bt LEFT JOIN customers c ON c.id=bt.customer_id WHERE bt.id=?', req.query.boat) : null;
+    const boat = req.query.boat ? await h.get('SELECT bt.*, c.name owner FROM boats bt LEFT JOIN customers c ON c.id=bt.customer_id WHERE bt.id=?', req.query.boat) : null;
     if (!type || !boat) {
-      return page(req, res, 'New checklist', html`<form class="card" method="get" style="max-width:560px">
+      return await page(req, res, 'New checklist', html`<form class="card" method="get" style="max-width:560px">
         ${field('type', 'Checklist', { options: [['checkin', 'Receiving / check-in'], ['release', 'Release (boat going out)'], ['return', 'Return (boat coming back)']], value: type })}
-        ${field('boat', 'Boat', { options: h.all('SELECT bt.id, bt.name, c.name owner FROM boats bt LEFT JOIN customers c ON c.id=bt.customer_id ORDER BY bt.name').map((b) => [b.id, `${b.name} (${b.owner})`]) })}
+        ${field('boat', 'Boat', { options: (await h.all('SELECT bt.id, bt.name, c.name owner FROM boats bt LEFT JOIN customers c ON c.id=bt.customer_id ORDER BY bt.name')).map((b) => [b.id, `${b.name} (${b.owner})`]) })}
         <button class="btn btn-brand btn-block">Start</button></form>`, { active: '/admin/checklists' });
     }
-    const tpl = h.get('SELECT * FROM checklist_templates WHERE type=? AND active=1 ORDER BY id DESC', type);
+    const tpl = await h.get('SELECT * FROM checklist_templates WHERE type=? AND active=1 ORDER BY id DESC', type);
     const items = JSON.parse(tpl.items);
-    const release = type === 'return' ? h.get(`SELECT * FROM checklists r WHERE boat_id=? AND type='release' AND NOT EXISTS (SELECT 1 FROM checklists x WHERE x.release_id=r.id) ORDER BY created_at DESC`, boat.id) : null;
-    const last = h.get('SELECT inventory FROM checklists WHERE boat_id=? ORDER BY created_at DESC', boat.id);
+    const release = type === 'return' ? await h.get(`SELECT * FROM checklists r WHERE boat_id=? AND type='release' AND NOT EXISTS (SELECT 1 FROM checklists x WHERE x.release_id=r.id) ORDER BY created_at DESC`, boat.id) : null;
+    const last = await h.get('SELECT inventory FROM checklists WHERE boat_id=? ORDER BY created_at DESC', boat.id);
     const sections = [...new Set(items.map((i) => i.section))];
     const body = html`<form method="post" action="/admin/checklists" enctype="multipart/form-data" style="max-width:760px">
       <input type="hidden" name="type" value="${type}"><input type="hidden" name="boat_id" value="${boat.id}"><input type="hidden" name="template_id" value="${tpl.id}"><input type="hidden" name="release_id" value="${release?.id || ''}">
@@ -247,13 +247,13 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
         <div style="display:flex;justify-content:space-between;margin-top:8px"><button type="button" class="btn btn-outline btn-sm" data-clear="sigpad">Clear</button><span class="small muted">Sign with a finger or stylus</span></div>
         <label class="check" style="margin-top:14px"><input type="checkbox" name="email_customer" value="1" checked> Email a copy to the customer</label></div>
       <button class="btn btn-primary btn-block">Complete ${label(type)}</button></form>`;
-    page(req, res, label(type) + ' checklist', body, { active: '/admin/checklists' });
+    await page(req, res, label(type) + ' checklist', body, { active: '/admin/checklists' });
   });
 
-  r.post('/checklists', upload.array('photos', 12), (req, res) => {
+  r.post('/checklists', upload.array('photos', 12), async (req, res) => {
     const b = req.body;
-    const boat = h.get('SELECT * FROM boats WHERE id=?', b.boat_id);
-    const tpl = h.get('SELECT * FROM checklist_templates WHERE id=?', b.template_id);
+    const boat = await h.get('SELECT * FROM boats WHERE id=?', b.boat_id);
+    const tpl = await h.get('SELECT * FROM checklist_templates WHERE id=?', b.template_id);
     if (!boat || !tpl) return back(req, res, 'Boat or template missing.');
     const items = JSON.parse(tpl.items);
     const results = {};
@@ -264,58 +264,59 @@ module.exports = (r, h, { page, back, flash, can, today, upload, QRCode }) => {
     }
     if (!b.signature) return back(req, res, 'The customer needs to sign.');
     if (b.type === 'release' && !b.released_to) return back(req, res, 'Enter who the boat was released to.');
-    const booking = h.get(`SELECT id FROM bookings WHERE boat_id=? AND status IN ('confirmed','active') ORDER BY start_date DESC`, boat.id);
+    const booking = await h.get(`SELECT id FROM bookings WHERE boat_id=? AND status IN ('confirmed','active') ORDER BY start_date DESC`, boat.id);
     const photos = (req.files || []).map((f) => '/uploads/' + f.filename);
-    const x = h.run(`INSERT INTO checklists (type,template_id,boat_id,booking_id,customer_id,staff_id,results,inventory,fuel_level,damage_notes,photos,signature,signed_name,released_to,release_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    const x = await h.run(`INSERT INTO checklists (type,template_id,boat_id,booking_id,customer_id,staff_id,results,inventory,fuel_level,damage_notes,photos,signature,signed_name,released_to,release_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       b.type, tpl.id, boat.id, booking?.id ?? null, boat.customer_id, req.user.id, JSON.stringify(results), b.inventory, b.fuel_level, b.damage_notes, JSON.stringify(photos), b.signature, b.signed_name, b.released_to || null, b.release_id || null);
     const id = Number(x.lastInsertRowid);
-    S.audit(h, req.user, 'create', 'checklist', id, { type: b.type, boat: boat.name, released_to: b.released_to });
-    if (b.type === 'checkin' && booking) h.run(`UPDATE bookings SET status='active' WHERE id=? AND status='confirmed'`, booking.id);
+    await S.audit(h, req.user, 'create', 'checklist', id, { type: b.type, boat: boat.name, released_to: b.released_to });
+    if (b.type === 'checkin' && booking) await h.run(`UPDATE bookings SET status='active' WHERE id=? AND status='confirmed'`, booking.id);
     if (b.email_customer) {
-      const cust = h.get('SELECT * FROM customers WHERE id=?', boat.customer_id);
-      if (cust?.email) S.notify(h, { to: cust.email, customerId: cust.id, subject: `${label(b.type)} report for ${boat.name}`, body: `Hi ${cust.name},\n\nYour ${label(b.type).toLowerCase()} report for ${boat.name} is ready: ${h.setting('base_url')}/portal/checklists/${id}\n\nCockatoo Marine` });
+      const cust = await h.get('SELECT * FROM customers WHERE id=?', boat.customer_id);
+      if (cust?.email) await S.notify(h, { to: cust.email, customerId: cust.id, subject: `${label(b.type)} report for ${boat.name}`, body: `Hi ${cust.name},\n\nYour ${label(b.type).toLowerCase()} report for ${boat.name} is ready: ${h.setting('base_url')}/portal/checklists/${id}\n\nCockatoo Marine` });
     }
     flash(res, `${label(b.type)} saved.`); res.redirect('/admin/checklists/' + id);
   });
 
-  r.get('/checklists/:id', (req, res, next) => {
-    const body = renderChecklist(h, req.params.id);
+  r.get('/checklists/:id', async (req, res, next) => {
+    const body = await renderChecklist(h, req.params.id);
     if (!body) return next();
-    page(req, res, 'Checklist report', html`<div class="no-print" style="margin-bottom:12px"><button class="btn btn-brand btn-sm" onclick="window.print()">Print / save PDF</button></div>${body}`, { active: '/admin/checklists' });
+    await page(req, res, 'Checklist report', html`<div class="no-print" style="margin-bottom:12px"><button class="btn btn-brand btn-sm" onclick="window.print()">Print / save PDF</button></div>${body}`, { active: '/admin/checklists' });
   });
 
   r.get('/checklists/templates', (req, res) => { res.redirect('/admin/settings?tab=checklists'); });
 
   // ======================= RELEASE LOG =======================
-  r.get('/releases', (req, res) => {
-    const rows = h.all(`SELECT r.*, bt.name boat, u.name staff, ret.created_at returned_at, ret.id ret_id, ru.name ret_staff FROM checklists r JOIN boats bt ON bt.id=r.boat_id LEFT JOIN users u ON u.id=r.staff_id
+  r.get('/releases', async (req, res) => {
+    const rows = await h.all(`SELECT r.*, bt.name boat, u.name staff, ret.created_at returned_at, ret.id ret_id, ru.name ret_staff FROM checklists r JOIN boats bt ON bt.id=r.boat_id LEFT JOIN users u ON u.id=r.staff_id
       LEFT JOIN checklists ret ON ret.release_id=r.id LEFT JOIN users ru ON ru.id=ret.staff_id WHERE r.type='release' ORDER BY r.created_at DESC`);
-    page(req, res, 'Release log', html`<p class="muted">Who took each boat out, who released it, and when it came back.</p><div class="card">${table([
+    for (const x of rows) x.diffs = x.ret_id ? await diffCount(h, x.id, x.ret_id) : null;
+    await page(req, res, 'Release log', html`<p class="muted">Who took each boat out, who released it, and when it came back.</p><div class="card">${table([
       { h: 'Boat', f: (x) => html`<a href="/admin/boats/${x.boat_id}">${x.boat}</a>` }, { h: 'Released', f: (x) => html`<a href="/admin/checklists/${x.id}">${dt(x.created_at)}</a>` },
       { h: 'Released to', k: 'released_to' }, { h: 'Released by', k: 'staff' },
       { h: 'Returned', f: (x) => x.returned_at ? html`<a href="/admin/checklists/${x.ret_id}">${dt(x.returned_at)}</a>` : pill('warn', 'Still out') }, { h: 'Received by', k: 'ret_staff' },
-      { h: 'Differences', f: (x) => { if (!x.ret_id) return ''; const n = diffCount(h, x.id, x.ret_id); return n ? pill('err', `${n} flagged`) : pill('ok', 'None'); } },
+      { h: 'Differences', f: (x) => { if (!x.ret_id) return ''; const n = x.diffs; return n ? pill('err', `${n} flagged`) : pill('ok', 'None'); } },
     ], rows)}</div>`);
   });
 };
 
-function diff(h, relId, retId) {
-  const a = h.get('SELECT * FROM checklists WHERE id=?', relId), b = h.get('SELECT * FROM checklists WHERE id=?', retId);
+async function diff(h, relId, retId) {
+  const a = await h.get('SELECT * FROM checklists WHERE id=?', relId), b = await h.get('SELECT * FROM checklists WHERE id=?', retId);
   const ra = JSON.parse(a.results), rb = JSON.parse(b.results);
   const items = Object.keys(rb).filter((k) => ra[k] && ra[k].status !== rb[k].status).map((k) => ({ item: k, out: ra[k].status, back: rb[k].status }));
   if ((a.fuel_level || '') !== (b.fuel_level || '')) items.push({ item: 'Fuel level', out: a.fuel_level, back: b.fuel_level });
   if ((a.inventory || '').trim() !== (b.inventory || '').trim()) items.push({ item: 'Inventory', out: a.inventory, back: b.inventory });
   return items;
 }
-const diffCount = (h, a, b) => diff(h, a, b).filter((x) => x.item !== 'Fuel level').length;
+const diffCount = async (h, a, b) => (await diff(h, a, b)).filter((x) => x.item !== 'Fuel level').length;
 
-function renderChecklist(h, id) {
-  const k = h.get('SELECT k.*, bt.name boat, bt.make_model, bt.length_m, c.name cname, u.name staff, t.name tname FROM checklists k JOIN boats bt ON bt.id=k.boat_id LEFT JOIN customers c ON c.id=k.customer_id LEFT JOIN users u ON u.id=k.staff_id LEFT JOIN checklist_templates t ON t.id=k.template_id WHERE k.id=?', id);
+async function renderChecklist(h, id) {
+  const k = await h.get('SELECT k.*, bt.name boat, bt.make_model, bt.length_m, c.name cname, u.name staff, t.name tname FROM checklists k JOIN boats bt ON bt.id=k.boat_id LEFT JOIN customers c ON c.id=k.customer_id LEFT JOIN users u ON u.id=k.staff_id LEFT JOIN checklist_templates t ON t.id=k.template_id WHERE k.id=?', id);
   if (!k) return null;
   const results = JSON.parse(k.results || '{}');
   const photos = JSON.parse(k.photos || '[]');
-  const ret = k.type === 'release' ? h.get('SELECT id FROM checklists WHERE release_id=?', k.id) : null;
-  const cmp = k.type === 'return' && k.release_id ? diff(h, k.release_id, k.id) : (ret ? diff(h, k.id, ret.id) : null);
+  const ret = k.type === 'release' ? await h.get('SELECT id FROM checklists WHERE release_id=?', k.id) : null;
+  const cmp = k.type === 'return' && k.release_id ? await diff(h, k.release_id, k.id) : (ret ? await diff(h, k.id, ret.id) : null);
   return html`<div class="card" style="max-width:860px">
     <div style="display:flex;justify-content:space-between;gap:16px;border-bottom:3px solid var(--brand);padding-bottom:12px;margin-bottom:14px">
       <img src="/static/img/logo-240.png" alt="Cockatoo Marine" style="height:60px;width:auto">

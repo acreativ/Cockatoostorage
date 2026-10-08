@@ -6,7 +6,12 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 class Raw { constructor(s) { this.s = s; } toString() { return this.s; } }
 const raw = (s) => new Raw(s);
 const html = (strings, ...vals) => raw(strings.reduce((out, s, i) => out + s + (i < vals.length ? fmt(vals[i]) : ''), ''));
-const fmt = (v) => (v instanceof Raw ? v.s : Array.isArray(v) ? v.map(fmt).join('') : v === false || v == null ? '' : esc(v));
+const fmt = (v) => {
+  // Guard against a forgotten `await`: a Promise would otherwise render as "[object Promise]".
+  if (v && typeof v.then === 'function') throw new Error('A Promise was passed to html`` — a database call is missing await.');
+  return fmtValue(v);
+};
+const fmtValue = (v) => (v instanceof Raw ? v.s : Array.isArray(v) ? v.map(fmt).join('') : v === false || v == null ? '' : esc(v));
 
 const STATUS = {
   hold: 'warn', pending: 'warn', confirmed: 'info', active: 'ok', maintenance: 'muted', completed: 'muted', cancelled: 'err', expired: 'err',

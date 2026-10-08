@@ -1,13 +1,14 @@
 const path = require('node:path');
-const fs = require('node:fs');
+const crypto = require('node:crypto');
 const express = require('express');
-const { open, helpers } = require('./src/db');
+const { connect } = require('./src/db');
+const { serveFile } = require('./src/files');
 const C = require('./src/core');
 const S = require('./src/services');
 
-const DB_FILE = process.env.DB_FILE || path.join(__dirname, 'data', 'cockatoo.db');
-const h = fs.existsSync(DB_FILE) ? helpers(open(DB_FILE)) : require('./src/seed').seed(DB_FILE);
-const SECRET = process.env.SESSION_SECRET || 'dev-only-secret-change-me';
+// Postgres (Supabase) via DATABASE_URL. Works the same locally (`npm start`) and on Vercel (exported app).
+const h = connect();
+
 
 const app = express();
 app.set('view engine', 'ejs');
@@ -16,20 +17,54 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
+// Session cookies are signed with SESSION_SECRET, or failing that a random secret generated once and kept in the database,
+// so every server instance signs and checks cookies with the same key.
+let SECRET = process.env.SESSION_SECRET || '';
+let readyP;
+const ensureReady = () => (readyP ??= (async () => {
+  if (!SECRET) {
+    await h.run(`INSERT INTO app_state (key, value) VALUES ('session_secret', ?) ON CONFLICT (key) DO NOTHING`, crypto.randomBytes(32).toString('hex'));
+    SECRET = (await h.get(`SELECT value FROM app_state WHERE key='session_secret'`)).value;
+  }
+  app.locals.SECRET = SECRET;
+})().catch((e) => { readyP = null; throw e; })); // retry on the next request if the database was unreachable
+
 // Stripe webhook needs the raw body for signature verification.
 app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
-app.use(express.urlencoded({ extended: true, limit: '8mb' }));
-app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '4mb' }));
+app.use(express.json({ limit: '4mb' }));
+// On Vercel, files in public/ are served by the CDN (vercel.json maps /static/* to them); this serves them locally.
 app.use('/static', express.static(path.join(__dirname, 'public'), { maxAge: '7d' }));
 
+// Scheduled jobs. There is no always-on process on Vercel, so they run on incoming requests:
+// expire lapsed holds at most once a minute, and the reminder/overdue/digest jobs at most every 15 minutes.
+// A compare-and-set in the database makes sure only one instance runs them; the jobs themselves are idempotent.
+async function claimJob(key, everyMs) {
+  const now = Date.now();
+  const r = await h.run(`INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    WHERE CAST(app_state.value AS bigint) < ? RETURNING key`, key, String(now), now - everyMs);
+  return r.changes > 0;
+}
+let lastCheck = 0;
+async function runDueJobs() {
+  if (Date.now() - lastCheck < 60e3) return; // this instance checked recently
+  lastCheck = Date.now();
+  if (await claimJob('jobs_holds_at', 60e3)) await S.expireHolds(h);
+  if (await claimJob('jobs_all_at', 15 * 60e3)) {
+    try { await S.runScheduledJobs(h); } catch (e) { console.error('jobs', e); }
+  }
+}
 
-// Session cookie → req.user
-app.use((req, res, next) => {
+// Per request: wait for startup, load settings, run due jobs, then read the session cookie → req.user.
+app.use(async (req, res, next) => {
+  await ensureReady();
+  await h.loadSettings();
+  if (!req.path.startsWith('/static')) await runDueJobs().catch((e) => console.error('jobs', e));
   const cookies = Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).filter((c) => c[0]));
   const v = C.unsign(decodeURIComponent(cookies.cm_sess || ''), SECRET);
   if (v) {
     const [id, exp] = v.split(':');
-    if (Number(exp) > Date.now()) req.user = h.get('SELECT id,email,name,role,customer_id FROM users WHERE id=?', Number(id));
+    if (Number(exp) > Date.now()) req.user = await h.get('SELECT id,email,name,role,customer_id FROM users WHERE id=?', Number(id));
   }
   req.cookies = cookies;
   res.locals.user = req.user;
@@ -42,13 +77,12 @@ app.use((req, res, next) => {
   res.locals.biz = { name: h.setting('business_name'), phone: h.setting('phone'), address: h.setting('address'), abn: h.setting('abn') };
   next();
 });
-app.use('/uploads', (req, res, next) => (req.user ? next() : res.status(403).end()), express.static(path.join(__dirname, 'uploads')));
+app.get('/uploads/:name', serveFile(h));
 app.locals.login = (res, user) => {
   const val = C.sign(`${user.id}:${Date.now() + 12 * 3600e3}`, SECRET);
   res.append('Set-Cookie', `cm_sess=${encodeURIComponent(val)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
 };
 app.locals.flash = (res, msg) => res.append('Set-Cookie', `cm_flash=${encodeURIComponent(msg)}; Path=/; Max-Age=30`);
-app.locals.SECRET = SECRET;
 
 app.use(require('./src/routes/public')(h, app));
 app.use(require('./src/routes/portal')(h, app));
@@ -60,9 +94,10 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).render('public/message', { title: 'Something went wrong', heading: 'Something went wrong', body: err.expose ? err.message : 'The error has been logged. Try again, or call the office.', meta: {} });
 });
 
-// Scheduled jobs: holds every minute, everything else every 15 minutes (idempotent via outbox dedupe keys).
-setInterval(() => S.expireHolds(h), 60e3).unref();
-setInterval(() => { try { S.runScheduledJobs(h); } catch (e) { console.error('jobs', e); } }, 15 * 60e3).unref();
+module.exports = app;
 
-const port = Number(process.env.PORT || 3000);
-app.listen(port, () => console.log(`Cockatoo Marine running on http://localhost:${port}`));
+// Local: `npm start`. On Vercel the exported app is used and this block does not run.
+if (require.main === module) {
+  const port = Number(process.env.PORT || 3000);
+  app.listen(port, () => console.log(`Cockatoo Marine running on http://localhost:${port}`));
+}

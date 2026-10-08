@@ -18,18 +18,19 @@ module.exports = (h, app) => {
     next();
   });
   const page = (req, res, title, body, active) => res.render('admin/layout', { title, body: String(body), actions: '', nav: NAV, active: active || '/portal' + (req.path === '/' ? '' : req.path), portal: true });
-  const bookings = (cid) => h.all(`SELECT b.*, bay.code, bay.zone, bt.name boat FROM bookings b JOIN bays bay ON bay.id=b.bay_id LEFT JOIN boats bt ON bt.id=b.boat_id WHERE b.customer_id=? AND b.status IN ('confirmed','active','pending') ORDER BY start_date`, cid);
+  const bookings = async (cid) => await h.all(`SELECT b.*, bay.code, bay.zone, bt.name boat FROM bookings b JOIN bays bay ON bay.id=b.bay_id LEFT JOIN boats bt ON bt.id=b.boat_id WHERE b.customer_id=? AND b.status IN ('confirmed','active','pending') ORDER BY start_date`, cid);
 
-  r.get('/portal', (req, res) => {
-    const c = h.get('SELECT * FROM customers WHERE id=?', req.cid);
-    const bks = bookings(req.cid);
-    const boats = h.all('SELECT * FROM boats WHERE customer_id=?', req.cid);
-    const owing = h.get(`SELECT COALESCE(SUM(total-paid),0) v FROM invoices WHERE customer_id=? AND status IN ('issued','overdue')`, req.cid).v;
+  r.get('/portal', async (req, res) => {
+    const c = await h.get('SELECT * FROM customers WHERE id=?', req.cid);
+    const bks = await bookings(req.cid);
+    const boats = await h.all('SELECT * FROM boats WHERE customer_id=?', req.cid);
+    const owing = (await h.get(`SELECT COALESCE(SUM(total-paid),0) v FROM invoices WHERE customer_id=? AND status IN ('issued','overdue')`, req.cid)).v;
     const month = C.todaySyd().slice(0, 7);
-    const upcoming = h.all(`SELECT l.*, bt.name boat FROM lifts l JOIN bookings b ON b.id=l.booking_id LEFT JOIN boats bt ON bt.id=l.boat_id WHERE b.customer_id=? AND l.date>=? AND l.status='booked' ORDER BY date, slot`, req.cid, C.todaySyd());
+    const upcoming = await h.all(`SELECT l.*, bt.name boat FROM lifts l JOIN bookings b ON b.id=l.booking_id LEFT JOIN boats bt ON bt.id=l.boat_id WHERE b.customer_id=? AND l.date>=? AND l.status='booked' ORDER BY date, slot`, req.cid, C.todaySyd());
+    for (const b of bks) b.liftsUsed = (await h.get(`SELECT COUNT(*) n FROM lifts WHERE booking_id=? AND substr(date,1,7)=? AND status<>'cancelled'`, b.id, month)).n;
     page(req, res, `Hi ${c.name.split(' ')[0]}`, html`
       ${owing > 0 ? html`<div class="alert warn">You have ${money(owing)} outstanding. <a href="/portal/invoices">View and pay invoices</a></div>` : ''}
-      <div class="kpis">${bks.map((b) => { const used = h.get(`SELECT COUNT(*) n FROM lifts WHERE booking_id=? AND substr(date,1,7)=? AND status<>'cancelled'`, b.id, month).n;
+      <div class="kpis">${bks.map((b) => { const used = b.liftsUsed;
         return html`<div class="kpi"><div class="v">${b.package === 'standard' ? `${Math.max(0, 2 - used)} left` : 'Unlimited'}</div><div class="l">Lifts this month · ${b.boat}</div></div>`; })}
         <div class="kpi"><div class="v">${money(owing)}</div><div class="l">Balance owing</div></div></div>
       <div class="cols">
@@ -39,10 +40,10 @@ module.exports = (h, app) => {
       </div>`, '/portal');
   });
 
-  r.get('/portal/lifts', (req, res) => {
-    const bks = bookings(req.cid).filter((b) => ['confirmed', 'active'].includes(b.status));
+  r.get('/portal/lifts', async (req, res) => {
+    const bks = (await bookings(req.cid)).filter((b) => ['confirmed', 'active'].includes(b.status));
     const date = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date || '') && req.query.date >= C.todaySyd() ? req.query.date : C.addDays(C.todaySyd(), 1);
-    const slots = S.liftSlots(h, date);
+    const slots = await S.liftSlots(h, date);
     page(req, res, 'Book a lift', html`<form class="card" method="get" style="max-width:640px"><div class="inline-form">${field('date', 'Date', { type: 'date', value: date, attrs: `min="${C.todaySyd()}"` })}<button class="btn btn-outline btn-sm">Check times</button></div></form>
       ${!bks.length ? html`<div class="alert warn">You need an active storage booking to book lifts.</div>` : slots.length ? html`<form class="card" method="post" action="/portal/lifts" style="max-width:640px"><h2>${d(date)}</h2>
         <input type="hidden" name="date" value="${date}">${field('booking_id', 'Boat', { options: bks.map((b) => [b.id, `${b.boat} (${label(b.package)})`]) })}
@@ -51,28 +52,28 @@ module.exports = (h, app) => {
         ${field('notes', 'Notes for the yard (optional)')}
         <button class="btn btn-primary">Book lift</button><p class="small muted" style="margin-top:8px">Standard includes 2 lifts a month. Extra lifts are $30, added to next month’s invoice.</p></form>` : html`<div class="alert warn">No lifts on this day. Choose another date.</div>`}`);
   });
-  r.post('/portal/lifts', (req, res) => {
-    const b = h.get('SELECT * FROM bookings WHERE id=? AND customer_id=?', req.body.booking_id, req.cid);
+  r.post('/portal/lifts', async (req, res) => {
+    const b = await h.get('SELECT * FROM bookings WHERE id=? AND customer_id=?', req.body.booking_id, req.cid);
     if (!b) return res.redirect('/portal/lifts');
     try {
-      const x = S.bookLift(h, { booking_id: b.id, date: req.body.date, slot: req.body.slot, engine_flush: !!req.body.engine_flush, notes: req.body.notes, via: 'portal' }, req.user);
+      const x = await S.bookLift(h, { booking_id: b.id, date: req.body.date, slot: req.body.slot, engine_flush: !!req.body.engine_flush, notes: req.body.notes, via: 'portal' }, req.user);
       app.locals.flash(res, x.extra ? 'Lift booked. This one is an extra lift ($30), added to next month’s invoice.' : 'Lift booked. We’ve emailed your confirmation.');
       res.redirect('/portal');
     } catch (e) { app.locals.flash(res, '!' + e.message); res.redirect('/portal/lifts?date=' + req.body.date); }
   });
 
-  r.get('/portal/invoices', (req, res) => {
-    const inv = h.all('SELECT * FROM invoices WHERE customer_id=? AND status<>? ORDER BY issue_date DESC', req.cid, 'void');
+  r.get('/portal/invoices', async (req, res) => {
+    const inv = await h.all('SELECT * FROM invoices WHERE customer_id=? AND status<>? ORDER BY issue_date DESC', req.cid, 'void');
     page(req, res, 'Invoices', html`<div class="card">${table([{ h: 'Invoice', f: (i) => html`<a href="/portal/invoices/${i.id}">${i.number}</a>` }, { h: 'Issued', f: (i) => d(i.issue_date) }, { h: 'For', f: (i) => i.period === 'deposit' ? 'Reservation fee' : i.period }, { h: 'Total', num: 1, f: (i) => money(i.total) }, { h: 'Status', f: (i) => pill(i.status) },
       { h: '', f: (i) => ['issued', 'overdue'].includes(i.status) ? html`<a class="btn btn-primary btn-sm" href="/portal/invoices/${i.id}/pay">Pay ${money(i.total - i.paid)}</a>` : '' }], inv)}</div>`);
   });
-  r.get('/portal/invoices/:id', (req, res, next) => {
-    const i = h.get('SELECT * FROM invoices WHERE id=? AND customer_id=?', req.params.id, req.cid);
+  r.get('/portal/invoices/:id', async (req, res, next) => {
+    const i = await h.get('SELECT * FROM invoices WHERE id=? AND customer_id=?', req.params.id, req.cid);
     if (!i) return next();
-    page(req, res, 'Invoice ' + i.number, html`<div class="no-print" style="margin-bottom:12px;display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="window.print()">Download PDF</button>${['issued', 'overdue'].includes(i.status) ? html`<a class="btn btn-primary btn-sm" href="/portal/invoices/${i.id}/pay">Pay now</a>` : ''}</div>${renderInvoice(h, i.id, res.locals.biz)}`, '/portal/invoices');
+    page(req, res, 'Invoice ' + i.number, html`<div class="no-print" style="margin-bottom:12px;display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="window.print()">Download PDF</button>${['issued', 'overdue'].includes(i.status) ? html`<a class="btn btn-primary btn-sm" href="/portal/invoices/${i.id}/pay">Pay now</a>` : ''}</div>${await renderInvoice(h, i.id, res.locals.biz)}`, '/portal/invoices');
   });
   r.get('/portal/invoices/:id/pay', async (req, res, next) => {
-    const i = h.get('SELECT i.*, c.email FROM invoices i JOIN customers c ON c.id=i.customer_id WHERE i.id=? AND i.customer_id=?', req.params.id, req.cid);
+    const i = await h.get('SELECT i.*, c.email FROM invoices i JOIN customers c ON c.id=i.customer_id WHERE i.id=? AND i.customer_id=?', req.params.id, req.cid);
     if (!i || !['issued', 'overdue'].includes(i.status)) return next();
     const amount = C.round2(i.total - i.paid);
     if (process.env.STRIPE_SECRET_KEY) {
@@ -88,26 +89,26 @@ module.exports = (h, app) => {
       <div class="live-price"><span>Amount due</span><strong class="num">${money(amount)}</strong></div>
       <form method="post" action="/portal/invoices/${i.id}/pay">${field('cc', 'Card number', { value: '4242 4242 4242 4242', attrs: 'readonly' })}<button class="btn btn-primary btn-block">Pay ${money(amount)}</button></form></div>`, '/portal/invoices');
   });
-  r.post('/portal/invoices/:id/pay', (req, res, next) => {
+  r.post('/portal/invoices/:id/pay', async (req, res, next) => {
     if (process.env.STRIPE_SECRET_KEY) return next();
-    const i = h.get('SELECT * FROM invoices WHERE id=? AND customer_id=?', req.params.id, req.cid);
+    const i = await h.get('SELECT * FROM invoices WHERE id=? AND customer_id=?', req.params.id, req.cid);
     if (!i) return next();
-    S.recordPayment(h, { invoice_id: i.id, customer_id: i.customer_id, amount: C.round2(i.total - i.paid), method: 'stripe', reference: 'demo_' + crypto.randomBytes(4).toString('hex') }, null);
+    await S.recordPayment(h, { invoice_id: i.id, customer_id: i.customer_id, amount: C.round2(i.total - i.paid), method: 'stripe', reference: 'demo_' + crypto.randomBytes(4).toString('hex') }, null);
     app.locals.flash(res, `Payment received for ${i.number}. Thank you.`); res.redirect('/portal/invoices');
   });
 
-  r.get('/portal/checklists', (req, res) => {
-    const rows = h.all('SELECT k.*, bt.name boat FROM checklists k JOIN boats bt ON bt.id=k.boat_id WHERE k.customer_id=? ORDER BY created_at DESC', req.cid);
+  r.get('/portal/checklists', async (req, res) => {
+    const rows = await h.all('SELECT k.*, bt.name boat FROM checklists k JOIN boats bt ON bt.id=k.boat_id WHERE k.customer_id=? ORDER BY created_at DESC', req.cid);
     page(req, res, 'Condition reports', html`<div class="card">${table([{ h: 'When', f: (k) => html`<a href="/portal/checklists/${k.id}">${dt(k.created_at)}</a>` }, { h: 'Type', f: (k) => label(k.type) }, { h: 'Boat', k: 'boat' }], rows)}</div>`);
   });
-  r.get('/portal/checklists/:id', (req, res, next) => {
-    if (!h.get('SELECT 1 FROM checklists WHERE id=? AND customer_id=?', req.params.id, req.cid)) return next();
-    page(req, res, 'Condition report', html`<div class="no-print" style="margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="window.print()">Download PDF</button></div>${renderChecklist(h, req.params.id)}`, '/portal/checklists');
+  r.get('/portal/checklists/:id', async (req, res, next) => {
+    if (!await h.get('SELECT 1 FROM checklists WHERE id=? AND customer_id=?', req.params.id, req.cid)) return next();
+    page(req, res, 'Condition report', html`<div class="no-print" style="margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="window.print()">Download PDF</button></div>${await renderChecklist(h, req.params.id)}`, '/portal/checklists');
   });
   r.get('/portal/boats/:id/sheet', async (req, res, next) => {
-    const b = h.get('SELECT * FROM boats WHERE id=? AND customer_id=?', req.params.id, req.cid);
+    const b = await h.get('SELECT * FROM boats WHERE id=? AND customer_id=?', req.params.id, req.cid);
     if (!b) return next();
-    const bk = h.get(`SELECT b.*, bay.code FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE b.boat_id=? AND b.status IN ('confirmed','active') ORDER BY b.start_date DESC`, b.id);
+    const bk = await h.get(`SELECT b.*, bay.code FROM bookings b JOIN bays bay ON bay.id=b.bay_id WHERE b.boat_id=? AND b.status IN ('confirmed','active') ORDER BY b.start_date DESC`, b.id);
     const qr = await QRCode.toDataURL(`${h.setting('base_url')}/q/${b.qr_token}`, { margin: 1, width: 360, color: { dark: '#17414E' } });
     page(req, res, 'Boat info sheet', html`<div class="no-print" style="margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="window.print()">Download PDF</button></div>
       <div class="card" style="max-width:760px;display:grid;grid-template-columns:1fr 200px;gap:20px"><div><img src="/static/img/logo-240.png" alt="Cockatoo Marine" style="height:56px;width:auto;margin-bottom:10px"><h2 style="font-size:1.6rem">${b.name}</h2>

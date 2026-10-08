@@ -25,7 +25,7 @@
       <div class="pkg featured">
         <span class="tag">Most flexible</span>
         <h3>Unlimited</h3><p class="muted">For regulars who want to go whenever the weather’s right.</p>
-        <div><span class="price num">$<%= h.get("SELECT MIN(monthly_rate) m FROM rates WHERE package='unlimited'").m %></span> <span class="muted">/month, from</span></div>
+        <div><span class="price num">$<%= minUnlimited %></span> <span class="muted">/month, from</span></div>
         <ul><li><span>Lifts</span><span>Unlimited</span></li><li><span>Extra lifts</span><span>Not needed</span></li><li><span>Transfers</span><span>Free with every lift</span></li><li><span>Fresh water hull wash down</span><span>Included</span></li><li><span>Engine flush</span><span>On request</span></li></ul>
         <a class="btn btn-brand" href="/book?pref=unlimited" style="margin-top:auto">Price Unlimited</a>
       </div>
