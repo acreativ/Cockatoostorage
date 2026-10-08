@@ -1,0 +1,244 @@
+<%- include('../partials/header') %>
+<%# Single-page booking flow: steps switch instantly in the browser; only the final step posts to the server. %>
+<div class="tripbar"><div class="wrap">
+  <div class="tb-item"><span class="tb-l">Boat</span><span class="tb-v" data-bind="boat">Tell us your boat length</span></div>
+  <div class="tb-item"><span class="tb-l">Storage from</span><span class="tb-v" data-bind="start">—</span></div>
+  <div class="tb-item"><span class="tb-l">Package</span><span class="tb-v" data-bind="pkgLabel">—</span></div>
+  <button type="button" class="btn btn-ghost-light btn-sm" data-go="1">Modify</button>
+</div></div>
+
+<div class="wrap" style="padding-top:24px">
+  <ol class="steps" aria-label="Booking progress" id="steps">
+    <li data-step="1"><span class="n">1</span><button type="button" data-go="1">Your boat</button></li>
+    <li data-step="2"><span class="n">2</span><button type="button" data-go="2">Choose package</button></li>
+    <li data-step="3"><span class="n">3</span><button type="button" data-go="3">Review &amp; book</button></li>
+  </ol>
+</div>
+
+<div class="wrap checkout" style="padding-top:0">
+  <div>
+    <!-- STEP 1 -->
+    <section class="panel" data-panel="1" aria-labelledby="s1h">
+      <h1 id="s1h" style="font-size:1.75rem">Where’s your boat going to live?</h1>
+      <p class="muted">Enter the overall length and when you’d like to start. We’ll show every package with live bay availability.</p>
+      <form id="s1">
+        <div class="row">
+          <div class="field"><label for="length">Boat length (overall)</label>
+            <div class="unit-input"><input id="length" name="length" type="number" inputmode="decimal" step="0.1" min="1" max="100" required>
+            <select name="unit" id="unit" aria-label="Unit"><option value="m">metres</option><option value="ft">feet</option></select></div></div>
+          <div class="field"><label for="start">Start date</label><input id="start" name="start" type="date" min="<%= C.todaySyd() %>" required></div>
+        </div>
+        <div class="field"><span class="label" id="typel">Boat type</span>
+          <div class="type-tiles" role="radiogroup" aria-labelledby="typel">
+            <% for (const t of ['Tinny','Runabout','Bowrider','Centre console','Half cabin','Cruiser']) { %>
+              <label><input type="radio" name="type" value="<%= t %>" <%= t === 'Runabout' ? 'checked' : '' %>><span><%= t %></span></label>
+            <% } %>
+          </div></div>
+        <div class="alert err" id="s1err" hidden role="alert"></div>
+        <button class="btn btn-primary" type="submit">Show storage options</button>
+      </form>
+    </section>
+
+    <!-- STEP 2 -->
+    <section data-panel="2" hidden aria-labelledby="s2h">
+      <div class="s2-head">
+        <div><h1 id="s2h" style="font-size:1.75rem;margin:0">Choose your package</h1>
+          <p class="muted" style="margin:4px 0 0" data-bind="s2sub"></p></div>
+        <div class="seg term-toggle" role="radiogroup" aria-label="Contract term">
+          <input type="radio" id="tt-a" name="tterm" value="annual" checked><label for="tt-a">Annual <span class="small">· best value</span></label>
+          <input type="radio" id="tt-m" name="tterm" value="monthly"><label for="tt-m">Monthly <span class="small">· 3 mo min</span></label>
+        </div>
+      </div>
+      <div class="alert warn" id="s2err" hidden></div>
+      <div id="cards" class="pk-list" aria-live="polite"></div>
+      <p class="small muted">Prices include GST and are billed monthly in advance. Extras are invoiced in arrears.</p>
+    </section>
+
+    <!-- STEP 3 -->
+    <form method="post" action="/book" id="bookform" data-panel="3" hidden>
+      <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <input type="hidden" name="lengthM"><input type="hidden" name="pkg"><input type="hidden" name="term"><input type="hidden" name="start"><input type="hidden" name="type">
+      <div class="panel">
+        <h2>Your boat</h2>
+        <div class="row">
+          <div class="field"><label for="make_model">Make and model</label><input id="make_model" name="make_model" type="text" placeholder="e.g. Haines Hunter 600R"></div>
+          <div class="field"><label for="boat_name">Boat name <span class="muted">(optional)</span></label><input id="boat_name" name="boat_name" type="text"></div>
+        </div>
+        <div class="row-3">
+          <div class="field"><label for="trailer">Trailer</label><select id="trailer" name="trailer"><option value="no">No trailer</option><option value="yes">On a trailer</option></select></div>
+          <div class="field"><label for="rego">Rego <span class="muted">(optional)</span></label><input id="rego" name="rego" type="text"></div>
+          <div class="field"><label for="hin">HIN <span class="muted">(optional)</span></label><input id="hin" name="hin" type="text"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Your details</h2>
+        <div class="field"><label for="name">Full name or company</label><input id="name" name="name" type="text" autocomplete="name" required></div>
+        <div class="row">
+          <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="phone">Mobile</label><input id="phone" name="phone" type="tel" autocomplete="tel" required></div>
+        </div>
+        <div class="field"><label for="message">Anything we should know? <span class="muted">(optional)</span></label><textarea id="message" name="message" rows="2"></textarea></div>
+      </div>
+      <div class="panel">
+        <h2>How would you like to continue?</h2>
+        <div class="choice-cards" role="radiogroup" aria-label="Next step">
+          <label class="choice"><input type="radio" name="action" value="card" checked><span><b>Pay the reservation fee now by card</b><span class="small muted">Your bay is held for <%= holdMinutes %> minutes while you pay securely. Confirmed instantly.</span></span><span class="choice-price" data-bind="deposit"></span></label>
+          <label class="choice"><input type="radio" name="action" value="bank"><span><b>Reserve now, pay by bank transfer</b><span class="small muted">We hold your bay for <%= pendingDays %> days. Bank details arrive by email.</span></span><span class="choice-price" data-bind="deposit"></span></label>
+          <label class="choice"><input type="radio" name="action" value="enquire"><span><b>Just enquire, no commitment</b><span class="small muted">We’ll call you to talk it through. Your bay isn’t reserved.</span></span><span class="choice-price">$0</span></label>
+        </div>
+        <label class="check" style="margin-top:18px" id="termsrow"><input type="checkbox" name="terms" value="yes"><span class="small">I accept the <a href="/terms-and-conditions" target="_blank">storage terms and conditions</a>.</span></label>
+        <div class="alert err" id="s3err" hidden role="alert" style="margin-top:14px"></div>
+        <button class="btn btn-primary btn-block" style="margin-top:18px" type="submit" id="bookbtn">Continue to payment</button>
+      </div>
+    </form>
+  </div>
+
+  <aside class="summary" aria-label="Your quote">
+    <h2 style="font-size:1.1rem">Your quote</h2>
+    <dl>
+      <dt>Boat</dt><dd class="num" data-bind="boatShort">—</dd>
+      <dt>Start</dt><dd data-bind="start">—</dd>
+      <dt>Package</dt><dd data-bind="pkgLabel">—</dd>
+      <dt>Term</dt><dd data-bind="termLabel">—</dd>
+      <dt>Size band</dt><dd data-bind="band">—</dd>
+      <dt>Contract value</dt><dd class="num" data-bind="contract">—</dd>
+    </dl>
+    <div class="total"><span>Monthly</span><strong class="num" data-bind="monthly">—</strong></div>
+    <div class="total" style="margin-top:0;border-top:0;padding-top:6px"><span class="small muted">Due today</span><span class="num" style="font-weight:600" data-bind="deposit">—</span></div>
+    <p class="small muted" style="margin:10px 0 0" data-bind="gstNote"></p>
+    <ul class="sum-incl small">
+      <li>Free transfer with every lift</li><li>Fresh water hull wash down</li><li>Online lift booking</li>
+    </ul>
+  </aside>
+</div>
+
+<template id="cardtpl">
+  <article class="pk">
+    <div class="pk-img"><img alt="" loading="lazy" width="700" height="440"></div>
+    <div class="pk-body">
+      <div class="pk-top"><h3></h3><span class="pk-flag"></span></div>
+      <p class="pk-sub muted small"></p>
+      <ul class="pk-feat"></ul>
+    </div>
+    <div class="pk-price">
+      <span class="pill"></span>
+      <div><span class="pk-amt num"></span><span class="muted small"> /month</span></div>
+      <span class="small muted pk-total"></span>
+      <button type="button" class="btn btn-primary btn-block">Select</button>
+    </div>
+  </article>
+</template>
+
+<script>
+(function () {
+  const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const aud = (n) => '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  const init = new URLSearchParams(location.search);
+  const S = { step: 1, length: init.get('length') || '', unit: init.get('unit') || 'm', start: init.get('start') || '<%= start %>', type: init.get('type') || 'Runabout',
+    pkg: init.get('pkg') || init.get('pref') || null, term: init.get('term') || 'annual', data: null };
+  const cache = new Map();
+  const PK = {
+    standard: { title: 'Standard', img: 'sailboat', sub: 'For a couple of trips a month', feat: ['2 lifts per month included', 'Extra lifts $30 each', 'Free transfer with every lift', 'Fresh water hull wash down'] },
+    unlimited: { title: 'Unlimited', img: 'hero-cruiser', flag: 'Most flexible', sub: 'Go whenever the weather’s right', feat: ['Unlimited lifts', 'Free transfer with every lift', 'Fresh water hull wash down', 'Engine flush on request'] },
+  };
+
+  async function load() {
+    const key = `${S.length}|${S.unit}|${S.start}`;
+    if (!cache.has(key)) cache.set(key, fetch(`/api/options?length=${encodeURIComponent(S.length)}&unit=${S.unit}&start=${S.start}`).then((r) => r.json()));
+    S.data = await cache.get(key);
+    return S.data;
+  }
+  const chosen = () => S.data?.options?.find((o) => o.pkg === S.pkg && o.term === S.term);
+
+  function bind() {
+    const c = chosen(), d = S.data;
+    const v = {
+      boat: d?.lengthM ? `${d.lengthM} m · ${d.lengthFt} ft${S.type ? ' ' + S.type.toLowerCase() : ''}` : 'Tell us your boat length',
+      boatShort: d?.lengthM ? `${d.lengthM} m · ${d.lengthFt} ft` : '—',
+      start: d?.startLabel || '—', pkgLabel: c ? PK[c.pkg].title : '—', termLabel: c ? (c.term === 'annual' ? 'Annual (12 months)' : 'Monthly (3 mo min)') : '—',
+      band: c ? c.band : '—', contract: c ? aud(c.contractValue) : '—', monthly: c ? aud(c.monthly) : '—', deposit: c ? aud(c.deposit) : '—',
+      gstNote: c ? `Includes GST of ${aud(c.gstMonthly)}/month. First month billed on your start date.` : '',
+      s2sub: d?.lengthM ? `${d.lengthM} m boat · from ${d.startLabel} · prices include GST` : '',
+    };
+    for (const el of $$('[data-bind]')) if (v[el.dataset.bind] !== undefined) el.textContent = v[el.dataset.bind];
+  }
+
+  function renderCards() {
+    const box = $('#cards'); box.innerHTML = '';
+    const err = $('#s2err');
+    if (S.data.error) { err.hidden = false; err.innerHTML = `${S.data.error} <a href="/enquiry">Send an enquiry</a>.`; return; }
+    err.hidden = true;
+    for (const o of S.data.options.filter((x) => x.term === S.term)) {
+      const p = PK[o.pkg], n = $('#cardtpl').content.cloneNode(true), card = n.firstElementChild;
+      if (o.pkg === S.pkg) card.classList.add('is-sel');
+      $('img', n).src = `/static/img/stock/${p.img}-800.jpg`;
+      $('h3', n).textContent = p.title;
+      const flag = $('.pk-flag', n); if (p.flag) flag.textContent = p.flag; else flag.remove();
+      $('.pk-sub', n).textContent = `${p.sub} · fits up to ${o.band.split('–')[1]}`;
+      $('.pk-feat', n).innerHTML = p.feat.map((f) => `<li>${f}</li>`).join('');
+      const pill = $('.pill', n);
+      if (o.available > 3) { pill.className = 'pill ok'; pill.textContent = `${o.available} bays free`; }
+      else if (o.available > 0) { pill.className = 'pill warn'; pill.textContent = `Only ${o.available} left`; }
+      else { pill.className = 'pill err'; pill.textContent = 'Fully booked'; }
+      $('.pk-amt', n).textContent = aud(o.monthly);
+      $('.pk-total', n).textContent = `${aud(o.contractValue)} over ${o.months} months`;
+      const btn = $('button', n);
+      if (!o.available) { btn.textContent = 'Join waitlist'; btn.className = 'btn btn-outline btn-block'; btn.onclick = () => { S.pkg = o.pkg; go(3); $$('input[name=action]').find((x) => x.value === 'enquire').checked = true; updAction(); }; }
+      else btn.onclick = () => { S.pkg = o.pkg; track('quote_started', { step: 'package_selected', package: o.pkg, term: o.term }); go(3); };
+      box.appendChild(n);
+    }
+  }
+
+  function syncUrl() {
+    const q = new URLSearchParams({ length: S.length, unit: S.unit, start: S.start, type: S.type });
+    if (S.step >= 2) q.set('term', S.term);
+    if (S.step === 3 && S.pkg) q.set('pkg', S.pkg);
+    history.replaceState(null, '', '/book?' + q);
+  }
+
+  async function go(step) {
+    if (step >= 2 && !S.length) step = 1;
+    if (step >= 2) { await load(); if (S.data.error && step === 3) step = 2; }
+    if (step === 3 && !chosen()) step = 2;
+    S.step = step;
+    $$('[data-panel]').forEach((p) => (p.hidden = Number(p.dataset.panel) !== step));
+    $$('#steps li').forEach((li) => { const n = Number(li.dataset.step); li.className = n < step ? 'done' : n === step ? 'current' : ''; li.querySelector('.n').textContent = n < step ? '✓' : n; li.toggleAttribute('aria-current', n === step); });
+    if (step === 2) { $$('input[name=tterm]').forEach((r) => (r.checked = r.value === S.term)); renderCards(); }
+    if (step === 3) { const f = $('#bookform'); f.lengthM.value = S.data.lengthM; f.pkg.value = S.pkg; f.term.value = S.term; f.start.value = S.data.start; f.type.value = S.type; }
+    bind(); syncUrl();
+    window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  }
+
+  // Step 1
+  const f1 = $('#s1');
+  f1.length.value = S.length; f1.unit.value = S.unit; f1.start.value = S.start;
+  $$('input[name=type]', f1).forEach((r) => (r.checked = r.value === S.type));
+  let pre;
+  f1.addEventListener('input', () => { clearTimeout(pre); pre = setTimeout(() => { S.length = f1.length.value; S.unit = f1.unit.value; S.start = f1.start.value; if (S.length > 0) load().then(bind); }, 250); });
+  f1.addEventListener('submit', (e) => {
+    e.preventDefault();
+    S.length = f1.length.value; S.unit = f1.unit.value; S.start = f1.start.value; S.type = (f1.type.value || 'Runabout');
+    const m = S.unit === 'ft' ? S.length * 0.3048 : Number(S.length);
+    const err = $('#s1err');
+    if (!(m > 0 && m <= 30)) { err.hidden = false; err.textContent = 'Enter a boat length between 1 and 30 metres (or 3 and 98 feet).'; return; }
+    err.hidden = true; track('quote_started', { step: 'boat' }); go(2);
+  });
+  // Step 2 term toggle
+  $$('input[name=tterm]').forEach((r) => r.addEventListener('change', () => { S.term = r.value; renderCards(); bind(); syncUrl(); }));
+  // Step 3
+  const f3 = $('#bookform'), btn = $('#bookbtn'), tr = $('#termsrow');
+  const labels = { card: 'Continue to payment', bank: 'Reserve my bay', enquire: 'Send enquiry' };
+  function updAction() { const a = f3.action.value; btn.textContent = labels[a]; tr.style.display = a === 'enquire' ? 'none' : 'flex'; }
+  f3.addEventListener('change', updAction); updAction();
+  f3.addEventListener('submit', (e) => {
+    const a = f3.action.value, err = $('#s3err');
+    if (a !== 'enquire' && !f3.terms.checked) { e.preventDefault(); err.hidden = false; err.textContent = 'Accept the terms and conditions to book, or choose “Just enquire”.'; return; }
+    track(a === 'enquire' ? 'enquiry_submitted' : 'booking_started', { package: S.pkg, term: S.term });
+    btn.disabled = true; btn.textContent = 'One moment…';
+  });
+  $$('[data-go]').forEach((b) => b.addEventListener('click', () => go(Number(b.dataset.go))));
+
+  go(S.length ? (init.get('pkg') ? 3 : 2) : 1);
+})();
+</script>
+<%- include('../partials/footer') %>

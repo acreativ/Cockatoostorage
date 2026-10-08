@@ -1,0 +1,37 @@
+<%- include('../partials/header') %>
+<section class="block" style="padding-top:36px"><div class="wrap" style="max-width:860px">
+  <% if (paid || (b.deposit_paid && b.status === 'confirmed')) { %>
+    <div class="alert ok no-print"><strong>Booking confirmed.</strong> We’ve emailed your confirmation to <%= b.email %>.</div>
+    <% if (paid) { %><script>document.addEventListener('DOMContentLoaded',()=>{track('deposit_paid',{value:<%= b.deposit_amount %>,currency:'AUD'});track('booking_completed',{ref:'<%= b.ref %>'})})</script><% } %>
+  <% } else if (b.status === 'pending') { %>
+    <div class="alert warn no-print"><strong>Bay reserved – awaiting your reservation fee.</strong> Pay <%= C.aud(b.deposit_amount) %> by <%= C.fmtDateTime(b.pending_expires_at) %> or the bay is released.</div>
+    <% if (isNew) { %><script>document.addEventListener('DOMContentLoaded',()=>track('booking_completed',{ref:'<%= b.ref %>',payment:'manual'}))</script><% } %>
+  <% } else if (b.status === 'expired' || b.status === 'cancelled') { %>
+    <div class="alert err"><strong>This booking is no longer active.</strong> <a href="/book">Start a new quote</a>.</div>
+  <% } %>
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;gap:16px;align-items:start;flex-wrap:wrap">
+      <div><img src="/static/img/logo-240.png" alt="Cockatoo Marine" style="height:64px;width:auto;margin-bottom:12px"><h1 style="font-size:1.6rem;margin:0">Booking summary</h1><p class="muted">Reference <strong><%= b.ref %></strong></p></div>
+      <button class="btn btn-outline btn-sm no-print" onclick="window.print()">Download PDF</button>
+    </div>
+    <table class="compare" style="margin-top:12px">
+      <tbody>
+        <tr><th scope="row">Customer</th><td><%= b.cname %></td></tr>
+        <tr><th scope="row">Boat</th><td><%= b.make_model || 'Boat' %> · <%= b.length_m %> m</td></tr>
+        <tr><th scope="row">Bay</th><td><%= b.bay_code %> · <%= b.zone %></td></tr>
+        <tr><th scope="row">Package / term</th><td><%= b.package === 'standard' ? 'Standard' : 'Unlimited' %> · <%= b.term === 'annual' ? 'Annual (12 months)' : 'Monthly (3-month minimum)' %></td></tr>
+        <tr><th scope="row">Dates</th><td><%= C.fmtDate(b.start_date) %> to <%= C.fmtDate(b.end_date) %></td></tr>
+        <tr><th scope="row">Monthly rate</th><td class="num"><%= C.aud(b.monthly_rate) %> incl. GST, billed monthly in advance</td></tr>
+        <tr><th scope="row">Reservation fee</th><td class="num"><%= C.aud(b.deposit_amount) %> · <%= b.deposit_paid ? 'Paid' : 'Not yet paid' %></td></tr>
+        <tr><th scope="row">Status</th><td><%= { hold: 'On hold', pending: 'Pending payment', confirmed: 'Confirmed', active: 'Active', expired: 'Expired', cancelled: 'Cancelled' }[b.status] %></td></tr>
+      </tbody>
+    </table>
+    <% if (!b.deposit_paid && b.status === 'pending') { %>
+      <h2 style="margin-top:24px">Pay by bank transfer</h2>
+      <p><%= bank %><br>Reference: <strong><%= b.ref %></strong></p>
+      <p class="small muted">Prefer card over the phone? Call <%= biz.phone %>.</p>
+    <% } %>
+    <p class="small muted" style="margin-top:20px"><%= biz.name %> · ABN <%= biz.abn %> · <%= biz.address %></p>
+  </div>
+</div></section>
+<%- include('../partials/footer') %>

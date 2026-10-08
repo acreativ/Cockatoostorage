@@ -1,0 +1,29 @@
+<%
+const W = { 0:'Clear', 1:'Mostly clear', 2:'Partly cloudy', 3:'Overcast', 45:'Fog', 48:'Fog', 51:'Light drizzle', 53:'Drizzle', 55:'Heavy drizzle', 61:'Light rain', 63:'Rain', 65:'Heavy rain', 80:'Showers', 81:'Showers', 82:'Heavy showers', 95:'Thunderstorm', 96:'Thunderstorm', 99:'Thunderstorm' };
+const compass = (d) => ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d / 22.5) % 16];
+%>
+<div class="wx" id="wx" aria-label="Weather on Cockatoo Island" aria-live="polite">
+<% if (wx && wx.current) { const c = wx.current; %>
+  <div>
+    <div class="small muted">Cockatoo Island now</div>
+    <div class="wx-now"><span class="wx-temp num"><%= Math.round(c.temperature_2m) %>°</span>
+      <div><div style="font-weight:600"><%= W[c.weather_code] || 'Conditions' %></div>
+      <div class="wx-wind"><span class="wx-arrow" aria-hidden="true" style="transform:rotate(<%= c.wind_direction_10m + 180 %>deg)">↑</span>
+        <span class="num"><%= Math.round(c.wind_speed_10m) %> kn <%= compass(c.wind_direction_10m) %></span></div>
+      <div class="small muted num">Gusts <%= Math.round(c.wind_gusts_10m) %> kn</div></div></div>
+  </div>
+  <div class="wx-days">
+    <% wx.daily.time.forEach((t, i) => { %>
+      <div class="wx-day"><b><%= i === 0 ? 'Today' : new Date(t + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short' }) %></b>
+        <span class="small"><%= W[wx.daily.weather_code[i]] || '' %></span><br>
+        <span class="num"><%= Math.round(wx.daily.temperature_2m_min[i]) %>–<%= Math.round(wx.daily.temperature_2m_max[i]) %>°</span><br>
+        <span class="small muted num">Wind <%= Math.round(wx.daily.wind_speed_10m_max[i]) %> kn <%= compass(wx.daily.wind_direction_10m_dominant[i]) %></span></div>
+    <% }) %>
+  </div>
+<% } else if (locals.lazy) { %>
+  <div data-wx-lazy><b>Loading live conditions…</b><p class="small muted">Wind and forecast for Cockatoo Island.</p></div>
+<% } else { %>
+  <div><b>Weather unavailable</b><p class="small muted">Live conditions could not be loaded. Check the BOM marine forecast for Sydney Harbour.</p></div>
+<% } %>
+</div>
+<p class="small muted" style="margin-top:8px">Source: Open-Meteo. Wind in knots. Always check the official BOM marine warnings before heading out.</p>

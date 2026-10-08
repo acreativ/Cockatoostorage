@@ -1,0 +1,8 @@
+<%- include('../partials/header') %>
+<section class="block"><div class="wrap" style="max-width:640px">
+  <h1 style="font-size:2rem"><%= heading %></h1><p class="muted" style="font-size:1.1rem"><%= body %></p>
+  <% if (locals.back) { %><button class="btn btn-brand" onclick="history.back()">Go back and fix</button><% } %>
+  <% if (locals.cta) { %><a class="btn btn-primary" href="<%= cta.href %>"><%= cta.label %></a><% } %>
+  <% if (!locals.back && !locals.cta) { %><a class="btn btn-outline" href="/">Back to home</a><% } %>
+</div></section>
+<%- include('../partials/footer') %>

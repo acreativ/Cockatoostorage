@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en-AU"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title><%= title %> · Cockatoo Marine admin</title>
+<link rel="icon" href="/static/img/icon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/site.css?v=<%= locals.assetV || 1 %>"><link rel="stylesheet" href="/static/css/admin.css?v=<%= locals.assetV || 1 %>">
+</head><body class="admin">
+<a class="skip" href="#main">Skip to content</a>
+<aside class="side" id="side">
+  <a class="side-logo" href="<%= portal ? '/portal' : '/admin' %>"><img src="/static/img/logo-240.png" alt="Cockatoo Marine" width="60" height="42"><span><%= portal ? 'My account' : 'Operations' %></span></a>
+  <nav aria-label="Admin">
+    <% for (const n of nav) { %><a href="<%= n[0] %>" <%- active === n[0] ? 'aria-current="page"' : '' %>><%= n[1] %><% if (n[2]) { %><span class="badge"><%= n[2] %></span><% } %></a><% } %>
+  </nav>
+  <div class="side-foot">
+    <div class="small"><b><%= user.name %></b><br><span class="muted"><%= user.role %></span></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><a class="btn btn-outline btn-sm" href="/">Website</a><form method="post" action="/logout"><button class="btn btn-outline btn-sm">Sign out</button></form></div>
+  </div>
+</aside>
+<div class="main-col">
+  <header class="abar"><button class="btn btn-outline btn-sm navbtn" onclick="document.getElementById('side').classList.toggle('open')" aria-controls="side">Menu</button>
+    <h1><%= title %></h1><div class="abar-actions"><%- actions || '' %></div></header>
+  <main id="main" class="acontent">
+    <% if (flash) { %><div class="alert <%= flash.startsWith('!') ? 'err' : 'ok' %>" role="status"><%= flash.replace(/^!/, '') %></div><% } %>
+    <%- body %>
+  </main>
+</div>
+<script src="/static/js/admin.js?v=<%= locals.assetV || 1 %>" defer></script>
+</body></html>

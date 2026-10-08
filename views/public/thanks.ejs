@@ -1,0 +1,9 @@
+<%- include('../partials/header') %>
+<section class="block"><div class="wrap" style="max-width:640px">
+  <div class="alert ok"><strong>Enquiry sent.</strong></div>
+  <h1 style="font-size:2rem">Thanks, <%= name.split(' ')[0] %>. We’ll be in touch.</h1>
+  <p class="muted" style="font-size:1.1rem">Our team replies within one business day. If it’s urgent, call <a href="tel:<%= biz.phone.replace(/\s|\(|\)/g,'') %>"><%= biz.phone %></a>.</p>
+  <a class="btn btn-outline" href="/">Back to home</a>
+</div></section>
+<script>document.addEventListener('DOMContentLoaded',()=>track('<%= event %>'))</script>
+<%- include('../partials/footer') %>

@@ -1,0 +1,70 @@
+<%- include('../partials/header') %>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Dry boat storage on Sydney Harbour, from $<%= minRate %> a month</h1>
+      <p class="lead">Keep your boat out of the water on Cockatoo Island. Choose a launch package, pick annual or monthly, and book your bay online in minutes.</p>
+      <ul class="hero-points"><li>Free transfers with every lift</li><li>Fresh water wash down</li><li>Book lifts online</li></ul>
+      <div style="display:flex;gap:12px;margin-top:28px;flex-wrap:wrap"><a class="btn btn-ghost-light" href="/enquiry">Enquire about other services</a></div>
+    </div>
+    <%- include('../partials/bookbox', { where: 'hero' }) %>
+  </div>
+</section>
+
+<div class="wrap"><div class="trust"><span><b>From $<%= minRate %>/mo</b>Dry storage, GST incl.</span><span><b>Free transfers</b>With every lift</span><span><b>Annual or monthly</b>3-month minimum on monthly</span><span><b>Book online</b>Card or bank transfer</span></div></div>
+<section class="block">
+  <div class="wrap">
+    <div class="section-head"><h2>Pick the package that fits how often you go out</h2><p>Both packages include a free transfer and a fresh water hull wash down with every lift.</p></div>
+    <div class="grid-2">
+      <div class="pkg">
+        <h3>Standard</h3><p class="muted">For boaters who head out a couple of times a month.</p>
+        <div><span class="price num">$<%= minRate %></span> <span class="muted">/month, from</span></div>
+        <ul><li><span>Lifts</span><span>2 per month</span></li><li><span>Extra lifts</span><span>$30 each</span></li><li><span>Transfers</span><span>Free with every lift</span></li><li><span>Fresh water hull wash down</span><span>Included</span></li><li><span>Engine flush</span><span>—</span></li></ul>
+        <a class="btn btn-outline" href="/book?pref=standard" style="margin-top:auto">Price Standard</a>
+      </div>
+      <div class="pkg featured">
+        <span class="tag">Most flexible</span>
+        <h3>Unlimited</h3><p class="muted">For regulars who want to go whenever the weather’s right.</p>
+        <div><span class="price num">$<%= h.get("SELECT MIN(monthly_rate) m FROM rates WHERE package='unlimited'").m %></span> <span class="muted">/month, from</span></div>
+        <ul><li><span>Lifts</span><span>Unlimited</span></li><li><span>Extra lifts</span><span>Not needed</span></li><li><span>Transfers</span><span>Free with every lift</span></li><li><span>Fresh water hull wash down</span><span>Included</span></li><li><span>Engine flush</span><span>On request</span></li></ul>
+        <a class="btn btn-brand" href="/book?pref=unlimited" style="margin-top:auto">Price Unlimited</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block alt">
+  <div class="wrap">
+    <div class="section-head"><h2>Annual or monthly</h2><p>Billed monthly in advance either way. Extras are invoiced in arrears.</p></div>
+    <table class="compare">
+      <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Annual</th><th scope="col">Monthly</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Commitment</th><td>12-month contract</td><td>One month at a time, 3-month minimum</td></tr>
+        <tr><th scope="row">Billing</th><td>Monthly in advance</td><td>Monthly in advance</td></tr>
+        <tr><th scope="row">Extras</th><td>Invoiced in arrears</td><td>Invoiced in arrears</td></tr>
+        <tr><th scope="row">Payment</th><td>Bank transfer or credit card</td><td>Bank transfer or credit card</td></tr>
+        <tr><th scope="row">Best for</th><td><strong>Best value rates</strong></td><td>Flexibility</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap">
+    <div class="section-head"><h2>Conditions on the island</h2><p>Wind speed and direction for Cockatoo Island, updated every 10 minutes.</p></div>
+    <div id="wx-slot"><%- include('../partials/weather', { wx, lazy: !wx }) %></div>
+    <% if (!wx) { %><script>fetch('/partials/weather').then(r=>r.text()).then(t=>{document.getElementById('wx-slot').innerHTML=t})</script><% } %>
+  </div>
+</section>
+
+<section class="block alt">
+  <div class="wrap">
+    <div class="section-head"><h2>More from the yard</h2><p>One team for storage, servicing and getting things across the harbour.</p></div>
+    <div class="grid-3">
+      <% for (const [href, t, d, img] of [['/service-antifoul','Antifouling & servicing','Haul-out, antifoul and routine maintenance on the island.','yacht-moored'],['/marina','Marina berths','Wet berths in the middle of Sydney Harbour.','sailboat'],['/commercial-berths','Commercial berths','Berthing for charter operators and work boats.','superyacht'],['/barging','Barging','Move materials and equipment across the harbour.','aerial-boat'],['/events','Events','Corporate outings and private charters.','sydney-opera'],['/dry-boat-storage','Dry boat storage','Out of the water, washed down and ready when you are.','hero-cruiser']]) { %>
+        <a class="service-link" href="<%= href %>"><img src="/static/img/stock/<%= img %>-800.jpg" alt="" loading="lazy" width="800" height="450"><span class="sl-body"><h3><%= t %></h3><span class="muted"><%= d %></span><span class="go">Learn more</span></span></a>
+      <% } %>
+    </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>

@@ -1,0 +1,31 @@
+</main>
+<section class="cta-band"><div class="wrap">
+  <div><h2>Know your boat length? Get a price in under a minute.</h2><p>Live availability, instant monthly rate, book online or send an enquiry.</p></div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn-primary" href="/book" onclick="track('quote_started',{location:'cta_band'})">Get a storage quote</a><a class="btn btn-ghost-light" href="/enquiry">Enquire</a></div>
+</div></section>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footgrid">
+      <div>
+        <a class="foot-logo" href="/"><img src="/static/img/logo-240.png" alt="Cockatoo Marine" width="80" height="56" loading="lazy"></a>
+        <p><%= biz.address %><br><a href="tel:<%= biz.phone.replace(/\s|\(|\)/g,'') %>"><%= biz.phone %></a></p>
+      </div>
+      <div><h3>Company</h3><ul>
+        <li><a href="/about">About</a></li><li><a href="/employment">Employment</a></li><li><a href="/events">Events</a></li>
+        <li><a href="/terms-and-conditions">Terms and Conditions</a></li><li><a href="/delivery-information">Delivery Information</a></li>
+      </ul></div>
+      <div><h3>Services</h3><ul>
+        <li><a href="/dry-boat-storage">Dry Boat Storage</a></li><li><a href="/service-antifoul">Antifouling &amp; servicing</a></li><li><a href="/marina">Marina</a></li>
+        <li><a href="/commercial-berths">Commercial Berths</a></li><li><a href="/barging">Barging</a></li>
+      </ul></div>
+    </div>
+    <div class="legal"><span>© <%= new Date().getFullYear() %> <%= biz.name %> · ABN <%= biz.abn %></span><span><a href="#" onclick="localStorage.removeItem('cm_consent');location.reload();return false">Cookie settings</a></span></div>
+  </div>
+</footer>
+<div class="consent" id="consent" role="dialog" aria-labelledby="consent-h" aria-live="polite">
+  <strong id="consent-h">Cookies</strong>
+  <p class="small" style="margin:6px 0 0">We use analytics cookies to see which pages help boat owners most. They are off unless you allow them.</p>
+  <div class="actions"><button class="btn btn-brand btn-sm" data-consent="granted">Allow analytics</button><button class="btn btn-outline btn-sm" data-consent="denied">Essential only</button></div>
+</div>
+<script src="/static/js/site.js?v=<%= locals.assetV || 1 %>" defer></script>
+</body></html>

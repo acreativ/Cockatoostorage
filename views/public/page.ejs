@@ -1,0 +1,58 @@
+<%- include('../partials/header') %>
+<section class="page-hero <%= page.image ? 'has-img' : '' %>" <% if (page.image) { %>style="--img:url('<%= page.image %>')"<% } %>><div class="wrap">
+  <% if (page.placeholder) { %><span class="placeholder-note">Placeholder copy – awaiting client content</span><% } %>
+  <h1><%= page.h1 %></h1><p class="lead"><%= page.lead %></p>
+  <% if (page.kind === 'storage') { %><a class="btn btn-primary" href="/book" onclick="track('quote_started',{location:'storage_page'})">Get a storage quote</a><% } %>
+</div></section>
+
+<% if (page.kind === 'storage') { %>
+<section class="block"><div class="wrap" style="display:grid;grid-template-columns:1fr 420px;gap:40px;align-items:start" id="storage-grid">
+  <div>
+    <h2>Launch packages</h2>
+    <table class="compare" style="margin-bottom:36px">
+      <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Standard</th><th scope="col">Unlimited</th></tr></thead>
+      <tbody><tr><th scope="row">Lifts</th><td>2 per month</td><td>Unlimited</td></tr><tr><th scope="row">Extra lifts</th><td>$30 each</td><td>n/a</td></tr>
+      <tr><th scope="row">Transfers</th><td>Free with every lift</td><td>Free with every lift</td></tr><tr><th scope="row">Fresh water hull wash down</th><td>Yes</td><td>Yes</td></tr>
+      <tr><th scope="row">Engine flush</th><td>—</td><td>If requested</td></tr></tbody>
+    </table>
+    <h2>Contract terms</h2>
+    <table class="compare" style="margin-bottom:36px">
+      <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Annual</th><th scope="col">Monthly</th></tr></thead>
+      <tbody><tr><th scope="row">Commitment</th><td>12-month contract</td><td>One month at a time, 3-month minimum</td></tr><tr><th scope="row">Billing</th><td>Monthly in advance</td><td>Monthly in advance</td></tr>
+      <tr><th scope="row">Extras</th><td>Invoiced in arrears</td><td>Invoiced in arrears</td></tr><tr><th scope="row">Payment</th><td>Bank transfer or credit card</td><td>Bank transfer or credit card</td></tr>
+      <tr><th scope="row">Note</th><td><strong>Best value rates</strong></td><td>—</td></tr></tbody>
+    </table>
+    <h2>How booking works</h2>
+    <ol class="prose"><li>Enter your boat length and start date to see live prices and availability.</li><li>Choose Standard or Unlimited, and Annual or Monthly.</li><li>Pay the reservation fee by card, or choose bank transfer, and your bay is reserved.</li><li>We email your confirmation and booking summary.</li></ol>
+  </div>
+  <div style="position:sticky;top:100px"><%- include('../partials/bookbox', { where: 'storage_page' }) %></div>
+</div></section>
+<style>@media (max-width:900px){#storage-grid{grid-template-columns:1fr!important}}</style>
+<% } else { %>
+<section class="block"><div class="wrap" style="display:grid;grid-template-columns:1fr 440px;gap:48px;align-items:start" id="page-grid">
+  <div class="prose">
+    <% for (const [hd, p] of (page.sections || [])) { %><h2 style="font-size:1.35rem"><%= hd %></h2><p><%= p %></p><% } %>
+    <% if (page.kind === 'enquiry') { %>
+      <div class="alert info"><strong>Looking for dry boat storage?</strong> The <a href="/book">quick quote</a> shows your price and live availability straight away.</div>
+      <p>Prefer to talk? Call <a href="tel:<%= biz.phone.replace(/\s|\(|\)/g,'') %>"><%= biz.phone %></a> or message us on Facebook.</p>
+    <% } %>
+  </div>
+  <% if (page.service) { %>
+  <form class="panel" method="post" action="/enquiry" onsubmit="track('enquiry_submitted',{service:this.service.value})">
+    <h2>Send an enquiry</h2>
+    <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <div class="field"><label for="svc">Service</label><select id="svc" name="service">
+      <% for (const [v, l] of [['storage','Dry boat storage'],['antifoul','Antifoul & servicing'],['marina','Marina berth'],['commercial','Commercial berth'],['barging','Barging'],['events','Events'],['other','Something else']]) { %>
+        <option value="<%= v %>" <%= page.service === v ? 'selected' : '' %>><%= l %></option><% } %></select></div>
+    <div class="field"><label for="en-name">Name</label><input id="en-name" name="name" type="text" autocomplete="name" required></div>
+    <div class="row"><div class="field"><label for="en-email">Email</label><input id="en-email" name="email" type="email" autocomplete="email"></div>
+    <div class="field"><label for="en-phone">Phone</label><input id="en-phone" name="phone" type="tel" autocomplete="tel"></div></div>
+    <div class="field"><label for="en-msg">How can we help?</label><textarea id="en-msg" name="message" rows="4" placeholder="Boat size, dates, what you need"></textarea></div>
+    <button class="btn btn-primary btn-block" type="submit">Send enquiry</button>
+    <p class="small muted" style="margin:10px 0 0">We reply within one business day.</p>
+  </form>
+  <% } %>
+</div></section>
+<style>@media (max-width:900px){#page-grid{grid-template-columns:1fr!important}}</style>
+<% } %>
+<%- include('../partials/footer') %>

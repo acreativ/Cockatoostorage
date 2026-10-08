@@ -1,0 +1,15 @@
+<%- include('../partials/header') %>
+<section class="block" style="padding-top:36px"><div class="wrap" style="max-width:560px">
+  <div class="panel">
+    <div class="alert warn"><strong>Demo payment mode.</strong> Stripe keys aren’t configured, so this page stands in for Stripe Checkout. It confirms the booking through the same code path as the Stripe webhook.</div>
+    <h1 style="font-size:1.5rem">Pay reservation fee</h1>
+    <p>Booking <strong><%= b.ref %></strong> · bay held until <strong id="exp"><%= C.fmtDateTime(b.hold_expires_at) %></strong></p>
+    <div class="live-price"><span>Amount due today</span><strong class="num"><%= C.aud(b.deposit_amount) %></strong></div>
+    <form method="post" action="/checkout/<%= b.ref %>/demo-pay">
+      <div class="field"><label for="cc">Card number</label><input id="cc" type="text" value="4242 4242 4242 4242" readonly></div>
+      <div class="row"><div class="field"><label for="ex">Expiry</label><input id="ex" type="text" value="12/34" readonly></div><div class="field"><label for="cvc">CVC</label><input id="cvc" type="text" value="123" readonly></div></div>
+      <button class="btn btn-primary btn-block" type="submit">Pay <%= C.aud(b.deposit_amount) %></button>
+    </form>
+  </div>
+</div></section>
+<%- include('../partials/footer') %>

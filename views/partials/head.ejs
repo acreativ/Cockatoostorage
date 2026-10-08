@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= meta.title || 'Cockatoo Marine' %></title>
+<% if (meta.description) { %><meta name="description" content="<%= meta.description %>"><% } %>
+<% const base = h.setting('base_url', ''); %>
+<% if (meta.path !== undefined && meta.path !== '') { %><link rel="canonical" href="<%= base + meta.path %>"><% } else { %><meta name="robots" content="noindex"><% } %>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Cockatoo Marine">
+<meta property="og:title" content="<%= meta.title || 'Cockatoo Marine' %>">
+<% if (meta.description) { %><meta property="og:description" content="<%= meta.description %>"><% } %>
+<meta property="og:image" content="<%= base %>/static/img/logo.png">
+<meta property="og:locale" content="en_AU">
+<meta name="theme-color" content="#215B6C">
+<link rel="icon" href="/static/img/icon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<% if (meta.path === '/') { %><link rel="preload" as="image" href="/static/img/stock/hero-cruiser.jpg" media="(min-width: 901px)"><link rel="preload" as="image" href="/static/img/stock/hero-cruiser-800.jpg" media="(max-width: 900px)"><% } %>
+<link rel="stylesheet" href="/static/css/site.css?v=<%= locals.assetV || 1 %>">
+<% if (meta.path === '/') { %>
+<script type="application/ld+json"><%- JSON.stringify({ '@context': 'https://schema.org', '@type': 'LocalBusiness', name: 'Cockatoo Marine', description: 'Dry boat storage, antifouling, marina and commercial berths, barging and events on Cockatoo Island, Sydney.', url: base, logo: base + '/static/img/logo.png', image: base + '/static/img/logo.png', telephone: biz.phone, priceRange: 'From $547/month', address: { '@type': 'PostalAddress', streetAddress: 'Cockatoo Island', addressLocality: 'Sydney', addressRegion: 'NSW', addressCountry: 'AU' }, geo: { '@type': 'GeoCoordinates', latitude: -33.847, longitude: 151.171 } }) %></script>
+<% } %>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function track(name, params) { window.dataLayer.push({ event: name, ...(params || {}) }); if (window.gtag) gtag('event', name, params || {}); }
+  window.GA4_ID = <%- JSON.stringify(ga4) %>;
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>

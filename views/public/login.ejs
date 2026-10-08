@@ -1,0 +1,52 @@
+<%- include('../partials/head') %>
+<div class="auth">
+  <section class="auth-visual" aria-label="Cockatoo Marine">
+    <a class="brandmark" href="/"><img src="/static/img/logo-240.png" alt="Cockatoo Marine home" width="74" height="52"></a>
+    <div>
+      <h2>Your boat, your bay, your account in one place.</h2>
+      <ul>
+        <li>Book lifts and see how many you have left this month</li>
+        <li>Pay invoices online and download tax invoices</li>
+        <li>View condition reports and your boat info sheet</li>
+      </ul>
+    </div>
+  </section>
+  <section class="auth-form">
+    <div class="inner">
+      <h1>Welcome back</h1>
+      <p class="muted">Sign in to manage your storage, or to run the yard.</p>
+      <div class="auth-tabs" role="tablist" aria-label="Account type">
+        <button type="button" role="tab" aria-selected="true" data-mode="customer">Boat owner</button>
+        <button type="button" role="tab" aria-selected="false" data-mode="staff">Staff</button>
+      </div>
+      <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
+      <% if (sent) { %><div class="alert ok" role="status">Check your email. If the address belongs to a customer account, a sign-in link is on its way. It works for 30 minutes.</div><% } %>
+      <form method="post" action="/login" id="loginform">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required autofocus></div>
+        <div class="field" id="pwfield"><div style="display:flex;justify-content:space-between"><label for="pw">Password</label><a class="small" href="#" id="forgot">Forgot password?</a></div>
+          <div class="pw-wrap"><input id="pw" name="password" type="password" autocomplete="current-password" required><button type="button" id="pwtoggle" aria-controls="pw">Show</button></div></div>
+        <button class="btn btn-brand btn-block" type="submit">Sign in</button>
+        <div id="magicbox"><div class="divider">or</div>
+          <button class="btn btn-outline btn-block" type="submit" name="magic" value="1" formnovalidate id="magicbtn">Email me a sign-in link</button>
+          <p class="small muted" style="margin-top:8px;text-align:center">No password needed. We’ll email you a one-time link.</p></div>
+        <p class="small muted" id="staffnote" hidden style="margin-top:14px">Staff accounts can turn on two-step verification in Settings.</p>
+      </form>
+      <div class="demo-creds"><b>Demo accounts</b> · password <code>demo1234</code><br>
+        <button type="button" data-fill="sam.taylor@example.com" data-m="customer">Customer</button><button type="button" data-fill="admin@cockatoo.test" data-m="staff">Admin</button><button type="button" data-fill="office@cockatoo.test" data-m="staff">Office</button><button type="button" data-fill="yard@cockatoo.test" data-m="staff">Yard</button><button type="button" data-fill="finance@cockatoo.test" data-m="staff">Finance</button></div>
+      <div class="auth-foot"><a href="/">Back to website</a><span>New to Cockatoo Marine? <a href="/book">Get a storage quote</a></span></div>
+    </div>
+  </section>
+</div>
+<script>
+(function(){
+  const tabs=document.querySelectorAll('.auth-tabs button'), magic=document.getElementById('magicbox'), note=document.getElementById('staffnote'), pw=document.getElementById('pw');
+  const set=(m)=>{tabs.forEach(t=>t.setAttribute('aria-selected',t.dataset.mode===m));magic.hidden=m==='staff';note.hidden=m!=='staff';};
+  tabs.forEach(t=>t.addEventListener('click',()=>set(t.dataset.mode)));
+  document.getElementById('pwtoggle').addEventListener('click',function(){const s=pw.type==='password';pw.type=s?'text':'password';this.textContent=s?'Hide':'Show';});
+  document.getElementById('magicbtn').addEventListener('click',()=>pw.removeAttribute('required'));
+  document.getElementById('forgot').addEventListener('click',e=>{e.preventDefault();set('customer');document.getElementById('magicbtn').focus();});
+  document.querySelectorAll('[data-fill]').forEach(b=>b.addEventListener('click',()=>{document.getElementById('email').value=b.dataset.fill;pw.value='demo1234';set(b.dataset.m);}));
+})();
+</script>
+</body></html>
