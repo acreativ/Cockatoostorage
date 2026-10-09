@@ -300,3 +300,18 @@ table.compare tbody th { font-weight: 500; color: var(--text-muted); width: 34%;
 .choice-price { font-weight: 700; color: var(--brand); white-space: nowrap; }
 .sum-incl { list-style: none; padding: 12px 0 0; margin: 12px 0 0; border-top: 1px solid var(--border); display: grid; gap: 6px; color: var(--text-muted); }
 .sum-incl li::before { content: '✓'; color: var(--ok); font-weight: 700; margin-right: 8px; }
+
+/* Promo notification band */
+.promo { background: #DAE8EC; padding: 18px 0; text-align: center; }
+.promo-btn { display: inline-block; background: var(--signal); color: #fff; text-decoration: none; text-transform: uppercase; font-weight: 800; font-size: clamp(.95rem, 1.6vw, 1.35rem); letter-spacing: .01em; line-height: 1.25; padding: 12px 28px; border-radius: 14px; border: 2px solid #fff; box-shadow: 0 0 0 2px var(--signal); }
+.promo-btn:hover, .promo-btn:focus-visible { background: var(--signal-strong); color: #fff; }
+@media (max-width: 560px) { .promo-btn { padding: 10px 16px; border-radius: 10px; } }
+
+/* Content from the website editor */
+.cms-body h2 { font-size: 1.35rem; margin-top: 1.2em; }
+.cms-body h2:first-child { margin-top: 0; }
+.cms-body h3 { font-size: 1.15rem; margin-top: 1em; }
+.cms-body img { border-radius: var(--radius); margin: 12px 0; height: auto; }
+.cms-body blockquote { border-left: 3px solid var(--brand-tint); margin: 1em 0; padding: 4px 16px; color: var(--text-muted); }
+.cms-body .ql-align-center { text-align: center; } .cms-body .ql-align-right { text-align: right; }
+.cms-body li[data-list="bullet"] { list-style-type: disc; }

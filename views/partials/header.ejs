@@ -8,7 +8,7 @@
     <a class="logo" href="/" aria-label="Cockatoo Marine home"><img src="/static/img/logo-240.png" alt="Cockatoo Marine" width="80" height="56"></a>
     <button class="navtoggle" aria-expanded="false" aria-controls="mainnav" onclick="const n=document.getElementById('mainnav');n.classList.toggle('open');this.setAttribute('aria-expanded',n.classList.contains('open'))">Menu</button>
     <nav class="mainnav" id="mainnav" aria-label="Main">
-      <% for (const [href, label] of [['/service-antifoul','Service | Antifoul'],['/dry-boat-storage','Dry Boat Storage'],['/marina','Marina'],['/commercial-berths','Commercial Berths'],['/barging','Barging'],['/events','Events'],['/enquiry','Enquiry']]) { %>
+      <% for (const { slug, label } of menus.header) { const href = '/' + slug; %>
         <a href="<%= href %>" <%- path === href ? 'aria-current="page"' : '' %>><%= label %></a>
       <% } %>
       <a class="btn btn-primary btn-sm" href="/book" onclick="track('quote_started',{location:'header'})">Get a storage quote</a>

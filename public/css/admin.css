@@ -96,3 +96,17 @@ dl.kv dd { margin: 0; }
   dl.kv { grid-template-columns: 1fr; } dl.kv dt { margin-top: 6px; }
 }
 @media print { body.admin { display: block; background: #fff; } .side, .abar, .no-print { display: none !important; } .acontent { padding: 0; } .card { border: 0; } }
+
+/* Website editor */
+.cms-edit { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.cms-side .card h2 { font-size: .95rem; }
+.cms-title { font-size: 1.4rem !important; font-weight: 600; }
+#editor { min-height: 360px; background: #fff; font: 400 1rem/1.6 'Inter', sans-serif; }
+.ql-toolbar.ql-snow { border-radius: 8px 8px 0 0; border-color: var(--border); font-family: 'Inter', sans-serif; }
+.ql-container.ql-snow { border-radius: 0 0 8px 8px; border-color: var(--border); }
+.ql-editor h2 { font-size: 1.35rem; } .ql-editor img { max-width: 100%; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.media-grid figure { margin: 0; padding: 10px; }
+.media-grid img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 6px; margin-bottom: 6px; }
+.media-grid code { word-break: break-all; font-size: .75rem; }
+@media (max-width: 1000px) { .cms-edit { grid-template-columns: 1fr; } }

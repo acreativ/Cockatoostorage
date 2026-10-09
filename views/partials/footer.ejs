@@ -11,12 +11,10 @@
         <p><%= biz.address %><br><a href="tel:<%= biz.phone.replace(/\s|\(|\)/g,'') %>"><%= biz.phone %></a></p>
       </div>
       <div><h3>Company</h3><ul>
-        <li><a href="/about">About</a></li><li><a href="/employment">Employment</a></li><li><a href="/events">Events</a></li>
-        <li><a href="/terms-and-conditions">Terms and Conditions</a></li><li><a href="/delivery-information">Delivery Information</a></li>
+        <% for (const m of menus.footer) { %><li><a href="/<%= m.slug %>"><%= m.label %></a></li><% } %>
       </ul></div>
       <div><h3>Services</h3><ul>
-        <li><a href="/dry-boat-storage">Dry Boat Storage</a></li><li><a href="/service-antifoul">Antifouling &amp; servicing</a></li><li><a href="/marina">Marina</a></li>
-        <li><a href="/commercial-berths">Commercial Berths</a></li><li><a href="/barging">Barging</a></li>
+        <% for (const m of menus.header.filter((x) => x.slug !== 'enquiry')) { %><li><a href="/<%= m.slug %>"><%= m.label %></a></li><% } %>
       </ul></div>
     </div>
     <div class="legal"><span>© <%= new Date().getFullYear() %> <%= biz.name %> · ABN <%= biz.abn %></span><span><a href="#" onclick="localStorage.removeItem('cm_consent');location.reload();return false">Cookie settings</a></span></div>

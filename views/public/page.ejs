@@ -1,13 +1,14 @@
 <%- include('../partials/header') %>
 <section class="page-hero <%= page.image ? 'has-img' : '' %>" <% if (page.image) { %>style="--img:url('<%= page.image %>')"<% } %>><div class="wrap">
-  <% if (page.placeholder) { %><span class="placeholder-note">Placeholder copy – awaiting client content</span><% } %>
+  <% if (locals.draft) { %><span class="placeholder-note">Draft preview – only staff can see this page</span><% } %>
   <h1><%= page.h1 %></h1><p class="lead"><%= page.lead %></p>
-  <% if (page.kind === 'storage') { %><a class="btn btn-primary" href="/book" onclick="track('quote_started',{location:'storage_page'})">Get a storage quote</a><% } %>
+  <% if (page.template === 'storage') { %><a class="btn btn-primary" href="/book" onclick="track('quote_started',{location:'storage_page'})">Get a storage quote</a><% } %>
 </div></section>
 
-<% if (page.kind === 'storage') { %>
+<% if (page.template === 'storage') { %>
 <section class="block"><div class="wrap" style="display:grid;grid-template-columns:1fr 420px;gap:40px;align-items:start" id="storage-grid">
   <div>
+    <% if (page.body) { %><div class="cms-body" style="margin-bottom:28px"><%- page.body %></div><% } %>
     <h2>Launch packages</h2>
     <table class="compare" style="margin-bottom:36px">
       <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Standard</th><th scope="col">Unlimited</th></tr></thead>
@@ -31,8 +32,8 @@
 <% } else { %>
 <section class="block"><div class="wrap" style="display:grid;grid-template-columns:1fr 440px;gap:48px;align-items:start" id="page-grid">
   <div class="prose">
-    <% for (const [hd, p] of (page.sections || [])) { %><h2 style="font-size:1.35rem"><%= hd %></h2><p><%= p %></p><% } %>
-    <% if (page.kind === 'enquiry') { %>
+    <div class="cms-body"><%- page.body || '' %></div>
+    <% if (page.template === 'enquiry') { %>
       <div class="alert info"><strong>Looking for dry boat storage?</strong> The <a href="/book">quick quote</a> shows your price and live availability straight away.</div>
       <p>Prefer to talk? Call <a href="tel:<%= biz.phone.replace(/\s|\(|\)/g,'') %>"><%= biz.phone %></a> or message us on Facebook.</p>
     <% } %>

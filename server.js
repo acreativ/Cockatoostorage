@@ -12,6 +12,7 @@ const DB_FILE = process.env.DB_FILE || path.join(RUNTIME_DIR, 'data', 'cockatoo.
 process.env.UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(RUNTIME_DIR, 'uploads');
 fs.mkdirSync(process.env.UPLOAD_DIR, { recursive: true });
 const h = fs.existsSync(DB_FILE) ? helpers(open(DB_FILE)) : require('./src/seed').seed(DB_FILE);
+require('./src/cms').ensure(h);
 const SECRET = process.env.SESSION_SECRET || 'dev-only-secret-change-me';
 
 const app = express();
@@ -44,9 +45,12 @@ app.use((req, res, next) => {
   res.locals.ga4 = process.env.GA4_ID || '';
   res.locals.flash = cookies.cm_flash ? decodeURIComponent(cookies.cm_flash) : '';
   if (cookies.cm_flash) res.append('Set-Cookie', 'cm_flash=; Max-Age=0; Path=/');
+  res.locals.menus = require('./src/cms').menus(h);
   res.locals.biz = { name: h.setting('business_name'), phone: h.setting('phone'), address: h.setting('address'), abn: h.setting('abn') };
   next();
 });
+fs.mkdirSync(path.join(process.env.UPLOAD_DIR, 'media'), { recursive: true });
+app.use('/media', express.static(path.join(process.env.UPLOAD_DIR, 'media'), { maxAge: '30d' }));
 app.use('/uploads', (req, res, next) => (req.user ? next() : res.status(403).end()), express.static(process.env.UPLOAD_DIR));
 app.locals.login = (res, user) => {
   const val = C.sign(`${user.id}:${Date.now() + 12 * 3600e3}`, SECRET);

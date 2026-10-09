@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('node:crypto');
 const C = require('../core');
 const S = require('../services');
-const PAGES = require('../pages');
+const CMS = require('../cms');
 
 // ---------- Weather (Open-Meteo, keyless, cached 10 min) ----------
 let wxCache = { at: 0, data: null };
@@ -44,7 +44,7 @@ module.exports = (h, app) => {
     if (!wx || Date.now() - wxCache.at > 600e3) weather();
     const minRate = h.get('SELECT MIN(monthly_rate) m FROM rates').m;
     res.render('public/home', { meta: meta('Dry Boat Storage Sydney from $547/month | Cockatoo Marine',
-      'Affordable dry boat storage on Cockatoo Island, Sydney. Standard and Unlimited launch packages, annual or monthly terms. Get an instant quote and book online.', '/'), wx, minRate });
+      'Affordable dry boat storage on Cockatoo Island, Sydney. Standard and Unlimited launch packages, annual or monthly terms. Get an instant quote and book online.', '/'), wx, minRate, content: CMS.home(h) });
   });
 
   r.get('/api/weather', async (req, res) => res.json(await weather() || { error: 'unavailable' }));
@@ -230,14 +230,10 @@ module.exports = (h, app) => {
   // ----- SEO -----
   r.get('/robots.txt', (req, res) => res.type('text/plain').send(`User-agent: *\nDisallow: /admin\nDisallow: /portal\nDisallow: /booking/\nDisallow: /checkout/\nDisallow: /q/\nSitemap: ${h.setting('base_url')}/sitemap.xml\n`));
   r.get('/sitemap.xml', (req, res) => {
-    const urls = ['/', '/book', ...Object.keys(PAGES)].map((p) => `<url><loc>${h.setting('base_url')}${p}</loc></url>`).join('');
+    const urls = ['/', '/book', ...h.all(`SELECT slug FROM pages WHERE status='published'`).map((p) => '/' + p.slug)].map((p) => `<url><loc>${h.setting('base_url')}${p}</loc></url>`).join('');
     res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
   });
 
-  // ----- Content pages -----
-  for (const [path, page] of Object.entries(PAGES)) {
-    r.get(path, (req, res) => res.render('public/page', { meta: meta(page.title, page.description, path), page, path }));
-  }
 
   // ----- Auth -----
   r.get('/login', (req, res) => res.render('public/login', { meta: meta('Sign in | Cockatoo Marine', '', '/login'), next: req.query.next || '', error: null, sent: false }));
@@ -265,6 +261,14 @@ module.exports = (h, app) => {
     res.redirect('/portal');
   });
   r.post('/logout', (req, res) => { res.append('Set-Cookie', 'cm_sess=; Max-Age=0; Path=/'); res.redirect('/'); });
+
+  // ----- CMS pages (edited in Admin › Website). Last, so fixed routes win. Staff can preview drafts. -----
+  r.get('/:slug', (req, res, next) => {
+    const page = h.get('SELECT * FROM pages WHERE slug=?', req.params.slug);
+    const staff = req.user && req.user.role !== 'customer';
+    if (!page || (page.status !== 'published' && !staff)) return next();
+    res.render('public/page', { meta: meta(page.title || page.h1, page.description, page.status === 'published' ? '/' + page.slug : ''), page, path: '/' + page.slug, draft: page.status !== 'published' });
+  });
 
   return r;
 };

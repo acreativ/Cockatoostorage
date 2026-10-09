@@ -17,7 +17,7 @@ const NAV = [
   ['/admin/maintenance', 'Maintenance', ['admin', 'office', 'yard']], ['/admin/bays', 'Bays', ['admin', 'office', 'yard']],
   ['/admin/invoices', 'Invoices', ['admin', 'office', 'finance']], ['/admin/expenses', 'Expenses', ['admin', 'finance']],
   ['/admin/reports', 'Reports', ['admin', 'office', 'finance']], ['/admin/watchlist', 'Watchlist', ['admin']],
-  ['/admin/import', 'Import', ['admin']], ['/admin/settings', 'Settings', ['admin']],
+  ['/admin/website', 'Website', ['admin', 'office']], ['/admin/import', 'Import', ['admin']], ['/admin/settings', 'Settings', ['admin']],
   ['/admin/outbox', 'Outbox', ['admin', 'office']], ['/admin/audit', 'Audit log', ['admin']],
 ];
 
@@ -380,5 +380,6 @@ module.exports = (h, app) => {
   require('./admin-crm')(r, h, { page, back, flash, can, today, upload, QRCode, custOptions });
   require('./admin-ops')(r, h, { page, back, flash, can, today, upload, custOptions });
   require('./admin-finance')(r, h, { page, back, flash, can, today, upload, custOptions });
+  require('./admin-cms')(r, h, { page, back, flash, can });
   return r;
 };
