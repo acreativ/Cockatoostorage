@@ -68,7 +68,7 @@ p { margin: 0 0 1em; }
 @media (max-width: 900px) { .hero { background: linear-gradient(180deg, rgba(16,50,60,.9), rgba(23,65,78,.85)), url('/static/img/stock/hero-cruiser-800.jpg') center/cover, var(--brand); } }
 .hero::after { content: ''; position: absolute; inset: auto 0 0 0; height: 120px; background: url('/static/img/waves.svg') bottom/1600px 120px repeat-x; opacity: .18; pointer-events: none; }
 .hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; padding-top: 72px; padding-bottom: 96px; align-items: center; }
-.hero h1 { color: #fff; max-width: 15ch; }
+.hero .hero-title { color: #fff; max-width: 15ch; font-size: clamp(2rem, 4.4vw, 3.25rem); font-weight: 700; }
 .hero .lead { font-size: 1.15rem; color: #D4E7ED; max-width: 46ch; }
 .hero-points { list-style: none; padding: 0; margin: 24px 0 0; display: flex; flex-wrap: wrap; gap: 10px 24px; color: #fff; font-weight: 500; }
 .hero-points li::before { content: '✓'; color: #8FD3E5; margin-right: 8px; font-weight: 700; }
@@ -229,8 +229,10 @@ table.compare tbody th { font-weight: 500; color: var(--text-muted); width: 34%;
 .page-hero.has-img { background: linear-gradient(90deg, rgba(16,50,60,.92), rgba(23,65,78,.7) 55%, rgba(23,65,78,.3)), var(--img) center/cover; color: #fff; padding: 88px 0 72px; border: 0; }
 .page-hero.has-img .lead { color: #D4E7ED; }
 .page-hero.has-img h1 { color: #fff; max-width: 18ch; }
-.trust { display: flex; gap: 28px; flex-wrap: wrap; padding: 18px 0; border-bottom: 1px solid var(--border); font-size: .92rem; color: var(--text-muted); }
-.trust b { color: var(--text); display: block; font-size: 1.15rem; }
+.intro { padding: 64px 0 56px; text-align: center; border-bottom: 1px solid var(--border); }
+.intro h1 { font-size: clamp(1.6rem, 3vw, 2.25rem); color: var(--brand); max-width: 26ch; margin: 0 auto 16px; }
+.intro p { font-size: 1.1rem; color: var(--text-muted); max-width: 64ch; margin: 0 auto; }
+@media (max-width: 900px) { .intro { padding: 44px 0 40px; } }
 
 /* Login — split screen */
 .auth { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; background: #fff; }
